@@ -1,4 +1,98 @@
+# Kokoro C++ Inference
+
+English | [中文](#kokoro-c-推理)
+
+A high-performance, lightweight C++ inference implementation of the [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS model, built on ONNX Runtime. The project currently supports mixed **Chinese and English** synthesis.
+
+## Features
+
+- 🚀 **Fast inference**: powered by ONNX Runtime.
+- 🌏 **Bilingual**: native support for Chinese and English.
+
+## Requirements
+
+- **CMake** (3.14+)
+- **C++ compiler** (C++17 support required)
+- **Optional: Python 3** (for the data preparation scripts)
+
+## Data Preparation
+
+Before building, you need to prepare the model and voice files.
+
+### 1. Download the voice pack
+
+This project stores voice styles in a compact binary format. You need to download the voice data.
+
+Download `voices-v1.1-zh.bin` from [here](https://github.com/koth/kokoro.cpp/releases/download/voices_model_files/voices-v1.1-zh.bin).
+
+### 2. Download the model
+
+Download the ONNX model file.
+
+Download `kokoro-v1.1-zh.onnx` from [here](https://github.com/koth/kokoro.cpp/releases/download/voices_model_files/kokoro-v1.1-zh.onnx).
+
+## Building
+
+```bash
+mkdir build
+cmake -B build  -S .
+cmake --build build --config Release
+```
+
+## Usage
+
+Run the `kokoro_demo` executable, specifying the model, the voice file, and the input text.
+
+```bash
+./kokoro_demo <model_path> <voices_path> <"text to speak"> [vocab_path] [voice_name]
+```
+
+The voice name defaults to `zf_002`. English voices: `af_maple`, `af_sol`, `bf_vale`. For example:
+
+```bash
+./build/kokoro_demo models/kokoro-v1.1-zh.onnx models/voices-v1.1-zh.bin "Hello world" dict/vocab.txt af_maple
+```
+
+### Example
+
+```bash
+./build/kokoro_demo models/kokoro-v1.1-zh.onnx models/voices-v1.1-zh.bin "你好啊，这是一个测试。Hello world"
+```
+
+Because it depends on the bundled dictionaries, it must be run from the project root! The output audio is saved as `output.wav` in the current directory.
+
+## English G2P
+
+English words are converted to phonemes in the following order (output uses the Kokoro/misaki English phoneme set):
+
+1. `dict/user_en.dict`: user dictionary in CMU format (`WORD ARPAbet-phonemes`, e.g. `onnx AA1 N IH0 K S`). Highest priority; intended for proper nouns.
+2. `dict/cmudict-0.7b/cmudict.dict`: the CMU Pronouncing Dictionary.
+3. All-uppercase words of at most 5 letters (e.g. `GPU`) are spelled out by English letter names.
+4. Other out-of-vocabulary words are predicted by the `dict/g2p_en.weights` neural network, ported from [g2p_en](https://github.com/Kyubyong/g2p) (Apache-2.0, see `dict/g2p_en.LICENSE.txt`).
+
+`g2p_en.weights` is generated from g2p_en's `checkpoint20.npz` (numpy not required):
+
+```bash
+python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
+```
+
+## Project Structure
+
+- `Kokoro.cpp/h`: main TTS class.
+- `ZHFrontend.cpp/h`: Chinese frontend (G2P, tone sandhi).
+- `EnG2P.h`, `NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
+- `scripts/`: helper scripts for data processing.
+- `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
+
+## License
+
+MIT
+
+---
+
 # Kokoro C++ 推理
+
+[English](#kokoro-c-inference) | 中文
 
 基于 ONNX Runtime 的 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS 模型的高性能轻量级 C++ 推理实现。本项目目前支持**中英文**混合合成。
 
