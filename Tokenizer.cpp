@@ -21,14 +21,10 @@ Tokenizer::Tokenizer(const TokenizerConfig& config, const std::map<std::string, 
     std::string user_en_dict = d + config.user_en_dict;
     std::string g2p_en_model = d + config.g2p_en_model;
 
-    try {
-        processor_ = std::make_shared<JiebaProcessor>(
-            jieba_dict, hmm_model, user_dict, idf_path, stop_word_path, pinyin_char, pinyin_phrase
-        );
-        g2p_ = std::make_unique<ZHG2P>(processor_, "1.1", "<unk>", cmu_dict, user_en_dict, g2p_en_model);
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to initialize Tokenizer dependencies: " << e.what() << std::endl;
-    }
+    processor_ = std::make_shared<JiebaProcessor>(
+        jieba_dict, hmm_model, user_dict, idf_path, stop_word_path, pinyin_char, pinyin_phrase
+    );
+    g2p_ = std::make_unique<ZHG2P>(processor_, "1.1", "<unk>", cmu_dict, user_en_dict, g2p_en_model);
 }
 
 Tokenizer::~Tokenizer() = default;
@@ -65,7 +61,6 @@ std::vector<int> Tokenizer::tokenize(const std::string& phonemes) {
 }
 
 std::string Tokenizer::phonemize(const std::string& text, bool norm) {
-    if (!g2p_) return text;
     auto result = (*g2p_)(text);
     return result.first; 
 }

@@ -122,7 +122,6 @@ bool NeuralG2P::load(const std::string& path) {
     fc_w_ = std::move(t["fc_w"].data);
     fc_b_ = std::move(t["fc_b"].data);
     hidden_ = static_cast<int>(h);
-    std::cout << "[NeuralG2P] Loaded " << path << std::endl;
     return true;
 }
 

@@ -95,7 +95,6 @@ private:
         }
         std::unordered_set<std::string> seen;
         std::string line;
-        size_t before = dict_.size();
         while (std::getline(file, line)) {
             if (line.empty()) continue;
             // CMU dict lines start with word, possibly with symbols like !EXCLAMATION-POINT
@@ -126,8 +125,6 @@ private:
                 dict_[word] = std::move(phonemes);
             }
         }
-        std::cout << "[EnG2P] Loaded " << (override ? seen.size() : dict_.size() - before)
-                  << " words from " << path << std::endl;
     }
 
     // ARPAbet -> Kokoro's English phoneme set (misaki, US; see

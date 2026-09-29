@@ -5,6 +5,8 @@
 #include "cppjieba/Jieba.hpp"
 #include "Utils.h"
 #include <regex>
+#include <fstream>
+#include <stdexcept>
 
 class JiebaProcessor : public TextProcessor {
 public:
@@ -15,11 +17,12 @@ public:
                    const std::string& stop_word_path,
                    const std::string& pinyin_char_path,
                    const std::string& pinyin_word_path) 
-        : jieba(dict_path, hmm_path, user_dict_path, idf_path, stop_word_path) 
+        : jieba(require_file(dict_path), require_file(hmm_path), require_file(user_dict_path),
+                require_file(idf_path), require_file(stop_word_path))
     {
         finder = std::make_shared<PinyinFinder>();
         if (!finder->init(pinyin_char_path, pinyin_word_path)) {
-            std::cerr << "Failed to init PinyinFinder" << std::endl;
+            throw std::runtime_error("Failed to load pinyin dictionaries: " + pinyin_char_path + ", " + pinyin_word_path);
         }
     }
 
@@ -98,6 +101,14 @@ public:
     }
 
 private:
+    // cppjieba aborts the process on a missing dictionary; fail with an exception first.
+    static const std::string& require_file(const std::string& path) {
+        if (!std::ifstream(path).is_open()) {
+            throw std::runtime_error("Failed to open jieba dictionary: " + path);
+        }
+        return path;
+    }
+
     cppjieba::Jieba jieba;
     std::shared_ptr<PinyinFinder> finder;
 };

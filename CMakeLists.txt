@@ -1,40 +1,30 @@
-cmake_minimum_required(VERSION 3.14)
-project(KokoroCPP)
+cmake_minimum_required(VERSION 3.15)
+project(KokoroCPP VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 使用静态链接库，但添加所有必要的链接选项
+# libkokoro only exports the C API; everything else stays internal.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
 if (MSVC)
-    # 基本编译选项
-    add_compile_options("/utf-8")
-    add_compile_options("/EHsc")
-    
-    # 使用静态链接的多线程运行时库
+    add_compile_options("/utf-8" "/EHsc" "/Zc:inline" "/permissive-" "/Ob2")
+
+    # The bundled static onnxruntime.lib is built with /MT and _ITERATOR_DEBUG_LEVEL=0,
+    # so every configuration must use the static release CRT.
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
-    
-    # 禁用弃用警告
-    add_compile_definitions(_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
-    
-    # 添加额外的编译器选项来解决链接问题
-    add_compile_options("/Zc:inline")
-    add_compile_options("/permissive-")
-    add_compile_options("/Ob2")
-    
-    # 链接器选项在全局范围内设置
-    add_link_options("/FORCE:MULTIPLE")
-    
-    # 添加必要的宏定义
-    add_compile_definitions(NOMINMAX)
-    add_compile_definitions(WIN32_LEAN_AND_MEAN)
+
+    add_compile_definitions(_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 # ONNX Runtime Configuration
 # Priority 1: Check third_party/onnxruntime
-set(LOCAL_ONNX_PATH "${CMAKE_SOURCE_DIR}/third_party/onnxruntime")
+set(LOCAL_ONNX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime")
 if(EXISTS "${LOCAL_ONNX_PATH}")
     message(STATUS "Using local ONNX Runtime from: ${LOCAL_ONNX_PATH}")
     set(ONNXRUNTIME_ROOT "${LOCAL_ONNX_PATH}")
@@ -130,21 +120,13 @@ if(NOT ONNXRUNTIME_LIB)
     endforeach()
 endif()
 
-if (ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIB)
-    message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
-    include_directories(${ONNXRUNTIME_INCLUDE_DIR})
-else()
-    message(WARNING "ONNX Runtime not found. Please set ONNXRUNTIME_ROOT to your installation path.")
-    message(WARNING "Example: cmake -DONNXRUNTIME_ROOT=/path/to/onnxruntime ..")
+if (NOT (ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIB))
+    message(FATAL_ERROR "ONNX Runtime not found. Set ONNXRUNTIME_ROOT, e.g. cmake -DONNXRUNTIME_ROOT=/path/to/onnxruntime ..")
 endif()
+message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
 
-# Include paths
-include_directories(${CMAKE_SOURCE_DIR})
-include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/include)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include)
-
-# Shared Sources
-set(LIB_SOURCES
+# Internal implementation, linked into libkokoro and the G2P demo.
+add_library(kokoro_core STATIC
     Kokoro.cpp
     Tokenizer.cpp
     ZHG2P.cpp
@@ -152,68 +134,62 @@ set(LIB_SOURCES
     ToneSandhi.cpp
     ZHFrontend.cpp
     NeuralG2P.cpp
-    missing_symbols.cpp
+)
+target_include_directories(kokoro_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cppjieba/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include
+    ${ONNXRUNTIME_INCLUDE_DIR}
 )
 
-add_library(kokoro_core STATIC ${LIB_SOURCES})
+# Public shared library: C API from include/kokoro/kokoro.h.
+add_library(kokoro SHARED kokoro_c.cpp)
+add_library(kokoro::kokoro ALIAS kokoro)
+target_include_directories(kokoro PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_compile_definitions(kokoro PRIVATE KOKORO_BUILD KOKORO_VERSION_STRING="${PROJECT_VERSION}")
+target_link_libraries(kokoro PRIVATE kokoro_core ${ONNXRUNTIME_LIB})
+set_target_properties(kokoro PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+)
 
-# 所有编译选项已在全局设置中配置
+if (MSVC)
+    # Static onnxruntime.lib ships without PDBs (LNK4099) and needs these system libraries.
+    target_link_options(kokoro PRIVATE "/IGNORE:4099")
+    target_link_libraries(kokoro PRIVATE Advapi32 Ws2_32 Shlwapi userenv Synchronization bufferoverflowu)
+elseif (APPLE)
+    target_link_libraries(kokoro PRIVATE "-framework Foundation" "-framework CoreFoundation")
+    set_target_properties(kokoro PROPERTIES INSTALL_RPATH "@loader_path")
+elseif (UNIX)
+    set_target_properties(kokoro PROPERTIES INSTALL_RPATH "$ORIGIN")
+endif()
 
 # Demo Executables
 add_executable(zhg2p_demo main.cpp)
-target_link_libraries(zhg2p_demo kokoro_core)
-
-# 为zhg2p_demo添加链接器选项
-if (MSVC)
-    target_link_options(zhg2p_demo PRIVATE "/IGNORE:4099" "/FORCE:MULTIPLE")
-    
-    # 添加必要的Windows系统库
-    target_link_libraries(zhg2p_demo "Advapi32.lib")
-    target_link_libraries(zhg2p_demo "Ws2_32.lib")
-    target_link_libraries(zhg2p_demo "Shlwapi.lib")
-    target_link_libraries(zhg2p_demo "userenv.lib")
-    
-    # 添加标准库支持
-    target_link_libraries(zhg2p_demo "Synchronization.lib")
-    
-    # 添加安全检查支持
-    target_link_libraries(zhg2p_demo "bufferoverflowu.lib")
-endif()
+target_link_libraries(zhg2p_demo PRIVATE kokoro_core)
 
 add_executable(kokoro_demo kokoro_main.cpp)
-target_link_libraries(kokoro_demo kokoro_core)
+target_link_libraries(kokoro_demo PRIVATE kokoro)
 
-if (ONNXRUNTIME_LIB)
-    target_link_libraries(kokoro_demo ${ONNXRUNTIME_LIB})
-    
-    # 添加额外的系统库
-    if (APPLE)
-        target_link_libraries(kokoro_demo "-framework Foundation" "-framework CoreFoundation")
-    endif()
-    
-    # Windows特殊处理
-    if (MSVC)
-        # 添加必要的Windows系统库
-        target_link_libraries(kokoro_demo "Advapi32.lib")
-        target_link_libraries(kokoro_demo "Ws2_32.lib")
-        target_link_libraries(kokoro_demo "Shlwapi.lib")
-        target_link_libraries(kokoro_demo "userenv.lib")
-        
-        # 添加标准库支持
-        target_link_libraries(kokoro_demo "Synchronization.lib")
-        
-        # 添加安全检查支持
-        target_link_libraries(kokoro_demo "bufferoverflowu.lib")
-        
-        # 添加链接器选项
-        target_link_options(kokoro_demo PRIVATE "/IGNORE:4099" "/FORCE:MULTIPLE")
-    endif()
-    
-    # Add rpath to find the dylib at runtime
-    if (APPLE)
-        set_target_properties(kokoro_demo PROPERTIES INSTALL_RPATH "@loader_path/../third_party/onnxruntime/lib/mac_arm64")
-    elseif (UNIX)
-        set_target_properties(kokoro_demo PROPERTIES INSTALL_RPATH "$ORIGIN/../third_party/onnxruntime/lib/linux_x64")
-    endif()
-endif()
+# Install: headers, libkokoro and a CMake package (find_package(kokoro) -> kokoro::kokoro).
+install(TARGETS kokoro EXPORT kokoroTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+install(DIRECTORY include/kokoro DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT kokoroTargets NAMESPACE kokoro:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kokoro)
+
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/kokoroConfig.cmake
+    "include(\"\${CMAKE_CURRENT_LIST_DIR}/kokoroTargets.cmake\")\n")
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/kokoroConfigVersion.cmake
+    COMPATIBILITY SameMajorVersion)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/kokoroConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/kokoroConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kokoro
+)
 

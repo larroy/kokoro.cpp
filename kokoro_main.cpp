@@ -1,4 +1,5 @@
-#include "Kokoro.h"
+#include <kokoro/kokoro.h>
+#include <string>
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -8,7 +9,31 @@
 #include <windows.h>
 #endif
 
-void save_audio(const std::string& filename, const std::vector<float>& audio, int sample_rate) {
+#ifdef _WIN32
+// The console hands argv over in the ANSI code page; the library expects UTF-8.
+static std::string ansi_to_utf8(const char* ansi) {
+    int wlen = MultiByteToWideChar(CP_ACP, 0, ansi, -1, NULL, 0);
+    if (wlen <= 0) return ansi;
+    std::wstring wstr(wlen, 0);
+    MultiByteToWideChar(CP_ACP, 0, ansi, -1, &wstr[0], wlen);
+    int len = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
+    if (len <= 0) return ansi;
+    std::string utf8(len, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &utf8[0], len, NULL, NULL);
+    utf8.resize(len - 1);
+    return utf8;
+}
+#endif
+
+static std::string arg_utf8(const char* arg) {
+#ifdef _WIN32
+    return ansi_to_utf8(arg);
+#else
+    return arg;
+#endif
+}
+
+void save_audio(const std::string& filename, const float* audio, size_t num_samples, int sample_rate) {
     // Simple WAV header writing
     std::ofstream file(filename, std::ios::binary);
     
@@ -16,7 +41,7 @@ void save_audio(const std::string& filename, const std::vector<float>& audio, in
     int bits_per_sample = 32; // Float
     int byte_rate = sample_rate * channels * bits_per_sample / 8;
     int block_align = channels * bits_per_sample / 8;
-    int data_size = static_cast<int>(audio.size() * sizeof(float));
+    int data_size = static_cast<int>(num_samples * sizeof(float));
     int chunk_size = 36 + data_size;
 
     file.write("RIFF", 4);
@@ -40,80 +65,44 @@ void save_audio(const std::string& filename, const std::vector<float>& audio, in
     
     file.write("data", 4);
     file.write(reinterpret_cast<const char*>(&data_size), 4);
-    file.write(reinterpret_cast<const char*>(audio.data()), data_size);
+    file.write(reinterpret_cast<const char*>(audio), data_size);
     
     std::cout << "Saved audio to " << filename << std::endl;
 }
 
 int main(int argc, char** argv) {
 #ifdef _WIN32
-    // 设置控制台代码页为UTF-8
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
-    
-    // 打印命令行参数
-    std::cout << "Command line arguments:" << std::endl;
-    for (int i = 0; i < argc; i++) {
-        std::cout << "  argv[" << i << "]: '" << argv[i] << "'" << std::endl;
-    }
 #endif
 
     if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <model_path> <voices.bin> <text> [vocab_path] [voice_name]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <model_path> <voices.bin> <text> [dict_dir] [voice_name]" << std::endl;
         return 1;
     }
 
-    std::string model_path = argv[1];
-    std::string voices_path = argv[2];
-    std::string text = argv[3];
-    
-#ifdef _WIN32
-    // 将ANSI编码的文本转换为UTF-8
-    std::string utf8_text;
-    
-    // 首先将ANSI转换为Unicode (UTF-16)
-    int wstr_len = MultiByteToWideChar(CP_ACP, 0, text.c_str(), -1, NULL, 0);
-    if (wstr_len > 0) {
-        std::wstring wstr(wstr_len, 0);
-        MultiByteToWideChar(CP_ACP, 0, text.c_str(), -1, &wstr[0], wstr_len);
-        
-        // 然后将Unicode (UTF-16)转换为UTF-8
-        int utf8_len = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
-        if (utf8_len > 0) {
-            utf8_text.resize(utf8_len);
-            WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &utf8_text[0], utf8_len, NULL, NULL);
-            utf8_text.resize(utf8_len - 1);  // 移除结尾的\0
-    
-            std::cout << "Converted text hex: " << utf8_text << std::endl;
-       
-            // 使用转换后的UTF-8文本
-            text = utf8_text;
-        } else {
-            std::cerr << "Failed to convert from UTF-16 to UTF-8" << std::endl;
-        }
-    } else {
-        std::cerr << "Failed to convert from ANSI to UTF-16" << std::endl;
-    }
-#endif
-    
-    std::string vocab_path = "dict/vocab.txt";
-    if (argc > 4) {
-        vocab_path = argv[4];
-    }
-    std::string voice_name = argc > 5 ? argv[5] : "zf_002";
+    const std::string model_path = arg_utf8(argv[1]);
+    const std::string voices_path = arg_utf8(argv[2]);
+    const std::string text = arg_utf8(argv[3]);
+    const std::string dict_dir = argc > 4 ? arg_utf8(argv[4]) : "dict";
+    const std::string voice_name = argc > 5 ? arg_utf8(argv[5]) : "zf_002";
 
-    try {
-        Kokoro tts(model_path, voices_path, vocab_path);
-        
-        auto voice = tts.get_voice_style(voice_name);
-        auto result = tts.create(text, voice, 1.0f);
-        
-        save_audio("output.wav", result.first, result.second);
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+    kokoro_ctx* ctx = nullptr;
+    if (kokoro_create(model_path.c_str(), voices_path.c_str(), dict_dir.c_str(), &ctx) != KOKORO_OK) {
+        std::cerr << "Error: " << kokoro_last_error() << std::endl;
         return 1;
     }
 
+    kokoro_audio audio;
+    const kokoro_status status = kokoro_synthesize(ctx, text.c_str(), voice_name.c_str(), 1.0f, 0, &audio);
+    if (status != KOKORO_OK) {
+        std::cerr << "Error: " << kokoro_last_error() << std::endl;
+        kokoro_destroy(ctx);
+        return 1;
+    }
+
+    save_audio("output.wav", audio.samples, audio.num_samples, audio.sample_rate);
+    kokoro_audio_free(&audio);
+    kokoro_destroy(ctx);
     return 0;
 }

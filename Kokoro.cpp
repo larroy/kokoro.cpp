@@ -5,6 +5,8 @@
 #include <regex>
 #include <numeric>
 #include <cstring>
+#include <filesystem>
+#include <stdexcept>
 
 // Helper to trim audio (simple amplitude based silence removal)
 std::vector<float> trim_audio(const std::vector<float>& audio, int sample_rate, float threshold_db = 60.0f) {
@@ -14,7 +16,12 @@ std::vector<float> trim_audio(const std::vector<float>& audio, int sample_rate, 
     return audio; 
 }
 
-Kokoro::Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& vocab_path) 
+// Paths cross the API as UTF-8; u8path keeps non-ASCII paths intact on Windows.
+static std::filesystem::path utf8_path(const std::string& path) {
+    return std::filesystem::u8path(path);
+}
+
+Kokoro::Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& dict_dir)
     : env_(ORT_LOGGING_LEVEL_WARNING, "Kokoro")
 {
     // Initialize session options
@@ -23,47 +30,46 @@ Kokoro::Kokoro(const std::string& model_path, const std::string& voices_path, co
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
     // Load model
-#ifdef _WIN32
-    std::wstring wmodel_path(model_path.begin(), model_path.end());
-    session_ = Ort::Session(env_, wmodel_path.c_str(), session_options);
-#else
-    session_ = Ort::Session(env_, model_path.c_str(), session_options);
-#endif
+    session_ = Ort::Session(env_, utf8_path(model_path).c_str(), session_options);
 
     // Load voices
     load_voices(voices_path);
 
     // Load vocab
+    std::string dir = dict_dir;
+    if (!dir.empty() && dir.back() != '/' && dir.back() != '\\') dir += "/";
+    const std::string vocab_path = dir + "vocab.txt";
     std::map<std::string, int> vocab;
-    std::ifstream in(vocab_path);
-    if (in.is_open()) {
-        std::string line;
-        while (std::getline(in, line)) {
-            // Expected format: token<TAB>id
-            size_t tab = line.find('\t');
-            if (tab != std::string::npos) {
-                std::string token = line.substr(0, tab);
-                std::string id_str = line.substr(tab + 1);
-                // Unescape token if needed (\n, \r, \t)
-                size_t pos = 0;
-                while((pos = token.find("\\n", pos)) != std::string::npos) { token.replace(pos, 2, "\n"); pos += 1; }
-                pos = 0;
-                while((pos = token.find("\\r", pos)) != std::string::npos) { token.replace(pos, 2, "\r"); pos += 1; }
-                pos = 0;
-                while((pos = token.find("\\t", pos)) != std::string::npos) { token.replace(pos, 2, "\t"); pos += 1; }
-                
-                try {
-                    vocab[token] = std::stoi(id_str);
-                } catch (...) {}
-            }
-        }
-        std::cout << "Loaded " << vocab.size() << " tokens from " << vocab_path << std::endl;
-    } else {
-        std::cerr << "Warning: Failed to open vocab file: " << vocab_path << ". Tokenizer will produce empty output." << std::endl;
+    std::ifstream in(utf8_path(vocab_path));
+    if (!in.is_open()) {
+        throw std::runtime_error("Failed to open vocab file: " + vocab_path);
+    }
+    std::string line;
+    while (std::getline(in, line)) {
+        // Expected format: token<TAB>id
+        size_t tab = line.find('\t');
+        if (tab == std::string::npos) continue;
+        std::string token = line.substr(0, tab);
+        std::string id_str = line.substr(tab + 1);
+        // Unescape token if needed (\n, \r, \t)
+        size_t pos = 0;
+        while((pos = token.find("\\n", pos)) != std::string::npos) { token.replace(pos, 2, "\n"); pos += 1; }
+        pos = 0;
+        while((pos = token.find("\\r", pos)) != std::string::npos) { token.replace(pos, 2, "\r"); pos += 1; }
+        pos = 0;
+        while((pos = token.find("\\t", pos)) != std::string::npos) { token.replace(pos, 2, "\t"); pos += 1; }
+
+        try {
+            vocab[token] = std::stoi(id_str);
+        } catch (...) {}
+    }
+    if (vocab.empty()) {
+        throw std::runtime_error("Vocab file contains no tokens: " + vocab_path);
     }
 
-    // Initialize Tokenizer
-    tokenizer_ = std::make_unique<Tokenizer>(TokenizerConfig{}, vocab);
+    TokenizerConfig config;
+    config.dict_dir = dir;
+    tokenizer_ = std::make_unique<Tokenizer>(config, vocab);
 }
 
 Kokoro::~Kokoro() {
@@ -71,56 +77,65 @@ Kokoro::~Kokoro() {
 }
 
 void Kokoro::load_voices(const std::string& voices_path) {
-    std::ifstream in(voices_path, std::ios::binary);
+    std::ifstream in(utf8_path(voices_path), std::ios::binary);
     if (!in.is_open()) {
-        std::cerr << "Failed to open voices file: " << voices_path << std::endl;
-        return;
+        throw std::runtime_error("Failed to open voices file: " + voices_path);
     }
 
     char magic[4];
-    in.read(magic, 4);
-    if (std::strncmp(magic, "VOIC", 4) != 0) {
-        std::cerr << "Invalid voices file format (Magic header mismatch). Expected 'VOIC'." << std::endl;
-        std::cerr << "Please run scripts/export_voices.py to convert voices.npy to voices.bin" << std::endl;
-        return;
+    if (!in.read(magic, 4) || std::strncmp(magic, "VOIC", 4) != 0) {
+        throw std::runtime_error("Invalid voices file (expected 'VOIC' header; convert voices.npy with "
+                                 "scripts/export_voices.py): " + voices_path);
     }
 
-    uint32_t version;
+    uint32_t version = 0;
     in.read(reinterpret_cast<char*>(&version), 4);
     if (version != 1) {
-        std::cerr << "Unsupported voices file version: " << version << std::endl;
-        return;
+        throw std::runtime_error("Unsupported voices file version " + std::to_string(version) + ": " + voices_path);
     }
 
-    uint32_t num_voices;
+    uint32_t num_voices = 0;
     in.read(reinterpret_cast<char*>(&num_voices), 4);
 
-    for (uint32_t i = 0; i < num_voices; ++i) {
-        uint32_t name_len;
-        in.read(reinterpret_cast<char*>(&name_len), 4);
-        
+    for (uint32_t i = 0; in && i < num_voices; ++i) {
+        uint32_t name_len = 0;
+        if (!in.read(reinterpret_cast<char*>(&name_len), 4)) break;
+
         std::string name(name_len, '\0');
-        in.read(&name[0], name_len);
-        
-        uint32_t dim;
-        in.read(reinterpret_cast<char*>(&dim), 4);
-        
+        uint32_t dim = 0;
+        if (!in.read(&name[0], name_len) || !in.read(reinterpret_cast<char*>(&dim), 4)) break;
+
         std::vector<float> style(dim);
-        in.read(reinterpret_cast<char*>(style.data()), dim * sizeof(float));
-        
-        voices_[name] = style;
+        if (!in.read(reinterpret_cast<char*>(style.data()), dim * sizeof(float))) break;
+
+        voices_[name] = std::move(style);
     }
-    
-    std::cout << "Loaded " << voices_.size() << " voices from " << voices_path << std::endl;
+
+    if (!in) {
+        throw std::runtime_error("Truncated voices file: " + voices_path);
+    }
+    if (voices_.empty()) {
+        throw std::runtime_error("Voices file contains no voices: " + voices_path);
+    }
 }
 
-std::vector<float> Kokoro::get_voice_style(const std::string& name) {
-    if (voices_.find(name) != voices_.end()) {
-        return voices_.at(name);
+const std::vector<float>& Kokoro::get_voice_style(const std::string& name) const {
+    auto it = voices_.find(name);
+    if (it == voices_.end()) {
+        throw std::out_of_range("Voice not found: " + name);
     }
-    std::cerr << "Voice " << name << " not found. Using default." << std::endl;
-    if (!voices_.empty()) return voices_.begin()->second;
-    return std::vector<float>(256, 0.0f);
+    return it->second;
+}
+
+std::vector<std::string> Kokoro::voice_names() const {
+    std::vector<std::string> names;
+    names.reserve(voices_.size());
+    for (const auto& entry : voices_) names.push_back(entry.first);
+    return names;
+}
+
+std::string Kokoro::phonemize(const std::string& text) {
+    return tokenizer_->phonemize(text);
 }
 
 std::vector<std::string> Kokoro::_split_phonemes(const std::string& phonemes) {
@@ -167,12 +182,6 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
     }
 
     std::vector<int> tokens_raw = tokenizer_->tokenize(truncated_phonemes);
-    
-    // Debug: print phonemes and tokens
-    std::cout << "Phonemes: " << truncated_phonemes << std::endl;
-    std::cout << "Tokens: ";
-    for(int t : tokens_raw) std::cout << t << " ";
-    std::cout << std::endl;
 
     // Add start and end tokens (0)
     std::vector<int64_t> tokens = {0};
@@ -238,8 +247,8 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
     input_tensors.push_back(Ort::Value::CreateTensor<float>(
         memory_info, selected_style.data(), selected_style.size(), style_shape.data(), style_shape.size()));
     
+    int speed_int = static_cast<int>(speed);
     if (use_new_schema) {
-        static int speed_int = (int)speed; 
         input_tensors.push_back(Ort::Value::CreateTensor<int>(
             memory_info, &speed_int, 1, speed_shape.data(), speed_shape.size()));
     } else {
@@ -279,7 +288,7 @@ std::pair<std::vector<float>, int> Kokoro::create(
 ) {
     std::string phonemes = text;
     if (!is_phonemes) {
-        phonemes = tokenizer_->phonemize(text);
+        phonemes = phonemize(text);
     }
     
     auto batched_phonemes = _split_phonemes(phonemes);

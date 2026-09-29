@@ -20,7 +20,6 @@ bool PinyinFinder::init(const std::string& singleCharacterDictPath,
     return false;
   }
   char line[4096] = {0};
-  int tn = 0;
   while (fgets(line, sizeof(line) - 1, fp)) {
     if (line[0] == '#') continue;
     size_t len = strlen(line);
@@ -65,9 +64,7 @@ bool PinyinFinder::init(const std::string& singleCharacterDictPath,
     if (!ss.empty()) {
         word_pinyin_dict_[ustr] = ss[0];
     }
-    tn += 1;
   }
-  LOG_INFO << "total pinyin character count: " << tn << std::endl;
 
   fclose(fp);
   fp = fopen(wordsDictPath.c_str(), "r");
@@ -77,7 +74,6 @@ bool PinyinFinder::init(const std::string& singleCharacterDictPath,
   }
   
   // Format: word: pinyin1 pinyin2
-  int pc = 0;
   while (fgets(line, sizeof(line) - 1, fp)) {
     if (line[0] == '#') continue;
     
@@ -117,9 +113,8 @@ bool PinyinFinder::init(const std::string& singleCharacterDictPath,
     BasicStringUtil::u8tou16(word.c_str(), word.size(), ustr);
     word_pinyin_dict_[ustr] = pinyin;
 
-    pc += 1;
   }
-  LOG_INFO << "total pinyin phrase count: " << pc << std::endl;
+  fclose(fp);
   return true;
 }
 

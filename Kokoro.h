@@ -20,11 +20,16 @@ const int SAMPLE_RATE = 24000;      // Example value
 
 class Kokoro {
 public:
-    Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& vocab_path = "dict/vocab.txt");
+    // Throws std::runtime_error when the model, voices, vocab or G2P dictionaries cannot be loaded.
+    // dict_dir holds vocab.txt and the G2P dictionaries. Paths are UTF-8.
+    Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& dict_dir);
     ~Kokoro();
 
-    
-    std::vector<float> get_voice_style(const std::string& name);
+    // Throws std::out_of_range when the voice does not exist.
+    const std::vector<float>& get_voice_style(const std::string& name) const;
+    std::vector<std::string> voice_names() const;
+    // Text -> phoneme string as consumed by create(..., is_phonemes = true).
+    std::string phonemize(const std::string& text);
 
     std::pair<std::vector<float>, int> create(
         const std::string& text,
