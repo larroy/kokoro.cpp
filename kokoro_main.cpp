@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
 #endif
 
     if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <model_path> <voices.bin> <text> [vocab_path]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <model_path> <voices.bin> <text> [vocab_path] [voice_name]" << std::endl;
         return 1;
     }
 
@@ -100,11 +100,12 @@ int main(int argc, char** argv) {
     if (argc > 4) {
         vocab_path = argv[4];
     }
+    std::string voice_name = argc > 5 ? argv[5] : "zf_002";
 
     try {
         Kokoro tts(model_path, voices_path, vocab_path);
         
-        auto voice = tts.get_voice_style("zf_002"); // Default voice
+        auto voice = tts.get_voice_style(voice_name);
         auto result = tts.create(text, voice, 1.0f);
         
         save_audio("output.wav", result.first, result.second);

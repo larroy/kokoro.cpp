@@ -22,6 +22,8 @@ int main() {
     const std::string PINYIN_CHAR     = DICT_DIR + "pinyin.txt";
     const std::string PINYIN_PHRASE   = DICT_DIR + "pinyin_phrase.txt";
     const std::string CMU_DICT        = DICT_DIR + "cmudict-0.7b/cmudict.dict";
+    const std::string USER_EN_DICT    = DICT_DIR + "user_en.dict";
+    const std::string G2P_EN_MODEL    = DICT_DIR + "g2p_en.weights";
 
     std::cout << "Initializing JiebaProcessor..." << std::endl;
     
@@ -44,7 +46,7 @@ int main() {
             PINYIN_PHRASE
         );
         
-        ZHG2P g2p(proc, "1.1", "<unk>", CMU_DICT);
+        ZHG2P g2p(proc, "1.1", "<unk>", CMU_DICT, USER_EN_DICT, G2P_EN_MODEL);
         
         std::cout << "Testing ZHG2P with Jieba" << std::endl;
         std::cout << "--------------------------------" << std::endl;

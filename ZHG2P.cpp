@@ -63,21 +63,6 @@ static const std::unordered_map<std::string, std::pair<std::string, int>> TONE_V
 // Utility Functions
 // ==========================================
 
-static const std::unordered_map<char, std::string> LETTER_TO_IPA = {
-    {'A', "ei̯"}, {'B', "pi"}, {'C', "si"}, {'D', "ti"}, {'E', "i"},
-    {'F', "ef"}, {'G', "tʂi"}, {'H', "ei̯tʂ"}, {'I', "ai̯"}, {'J', "tʂei̯"},
-    {'K', "kʰei̯"}, {'L', "el"}, {'M', "em"}, {'N', "en"}, {'O', "ou̯"},
-    {'P', "pʰi"}, {'Q', "kʰju"}, {'R', "aɻ"}, {'S', "es"}, {'T', "tʰi"},
-    {'U', "ju"}, {'V', "vi"}, {'W', "tʌplju"}, {'X', "eks"}, {'Y', "wai̯"},
-    {'Z', "zi"},
-    {'a', "ei̯"}, {'b', "pi"}, {'c', "si"}, {'d', "ti"}, {'e', "i"},
-    {'f', "ef"}, {'g', "tʂi"}, {'h', "ei̯tʂ"}, {'i', "ai̯"}, {'j', "tʂei̯"},
-    {'k', "kʰei̯"}, {'l', "el"}, {'m', "em"}, {'n', "en"}, {'o', "ou̯"},
-    {'p', "pʰi"}, {'q', "kʰju"}, {'r', "aɻ"}, {'s', "es"}, {'t', "tʰi"},
-    {'u', "ju"}, {'v', "vi"}, {'w', "tʌplju"}, {'x', "eks"}, {'y', "wai̯"},
-    {'z', "zi"}
-};
-
 static std::string replace_all(std::string str, const std::string& from, const std::string& to) {
     if (from.empty()) return str;
     size_t start_pos = 0;
@@ -108,15 +93,14 @@ static std::string trim(const std::string& str) {
 // ZHG2P Implementation
 // ==========================================
 
-ZHG2P::ZHG2P(std::shared_ptr<TextProcessor> proc, const std::string& ver, const std::string& u, const std::string& eng_dict_path)
+ZHG2P::ZHG2P(std::shared_ptr<TextProcessor> proc, const std::string& ver, const std::string& u,
+             const std::string& eng_dict_path, const std::string& eng_user_dict_path,
+             const std::string& eng_neural_model_path)
     : processor(std::move(proc)), version(ver), unk(u) {
     if (version == "1.1") {
         frontend = std::make_unique<ZHFrontend>(processor, unk);
     }
-    if (!eng_dict_path.empty()) {
-        std::cout << "Loading English G2P dict from " << eng_dict_path << "..." << std::endl;
-        eng_g2p = std::make_unique<EnG2P>(eng_dict_path);
-    }
+    eng_g2p = std::make_unique<EnG2P>(eng_dict_path, eng_user_dict_path, eng_neural_model_path);
 }
 
 std::string ZHG2P::retone(std::string p) {
@@ -364,37 +348,7 @@ std::pair<std::string, std::string> ZHG2P::operator()(const std::string& text) {
 
              if (tk.tag == "x" || tk.tag == "eng") {
                  for (const auto& p : tk.phonemes) {
-                     std::string converted_part;
-                     if (eng_g2p && tk.tag == "eng") {
-                         converted_part = eng_g2p->convert(p);
-                     }
-                     
-                     // Fallback for English words: letter by letter
-                     if ((converted_part.empty() || converted_part == p) && tk.tag == "eng") {
-                         // If conversion failed or returned same (meaning no dict entry found typically),
-                         // try letter mapping for pure alpha strings
-                         bool all_alpha = true;
-                         for(char c : p) {
-                             if(!isalpha(c)) { all_alpha = false; break; }
-                         }
-                         
-                         if (all_alpha) {
-                             converted_part = "";
-                             for(char c : p) {
-                                 if(LETTER_TO_IPA.count(c)) {
-                                     converted_part += LETTER_TO_IPA.at(c);
-                                 } else {
-                                     converted_part += c;
-                                 }
-                             }
-                         } else {
-                             converted_part = p; // keep as is if not all alpha
-                         }
-                     } else if (converted_part.empty()) {
-                         converted_part = p;
-                     }
-
-                     result += converted_part;
+                     result += tk.tag == "eng" ? eng_g2p->convert(p) : p;
                  }
              } else {
                  // Split phonemes into pinyin syllables based on tone digits

@@ -1,17 +1,23 @@
 #pragma once
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include "NeuralG2P.h"
 
 class EnG2P {
 public:
-    EnG2P(const std::string& dict_path) {
-        load_dict(dict_path);
-        init_arpabet_map();
+    // user_dict_path: optional CMU-format lexicon whose entries override the CMU dict.
+    // neural_model_path: optional g2p_en weights used to predict words missing from both dicts.
+    EnG2P(const std::string& dict_path, const std::string& user_dict_path = "",
+          const std::string& neural_model_path = "") {
+        if (!dict_path.empty()) load_dict(dict_path, false);
+        if (!user_dict_path.empty()) load_dict(user_dict_path, true);
+        if (!neural_model_path.empty()) neural_.load(neural_model_path);
     }
 
     std::string convert(const std::string& word) {
@@ -29,31 +35,67 @@ public:
         std::string prefix = upper_word.substr(0, start);
         std::string suffix = upper_word.substr(end);
         
+        const std::string original = clean_word;
         std::transform(clean_word.begin(), clean_word.end(), clean_word.begin(), ::toupper);
         
         // std::cout << "Debug EnG2P: Query [" << clean_word << "]" << std::endl;
         
-        if (dict_.count(clean_word)) {
-            return prefix + arpabet_to_ipa(dict_.at(clean_word)) + suffix;
+        auto it = dict_.find(clean_word);
+        if (it != dict_.end()) {
+            return prefix + arpabet_to_ipa(it->second) + suffix;
         }
-        
-        // Fallback: return original
-        return word; 
+
+        if (clean_word.empty()) return word;
+        const auto is_upper = [](unsigned char c) { return c >= 'A' && c <= 'Z'; };
+        const bool letters_only = std::all_of(clean_word.begin(), clean_word.end(), is_upper);
+
+        // Short all-caps words (GPU, API) are acronyms: spell them. Also the fallback
+        // for any unknown word when no neural model is loaded.
+        const bool acronym = letters_only && original.size() <= MAX_ACRONYM_LENGTH &&
+                             std::all_of(original.begin(), original.end(), is_upper);
+        if (letters_only && (acronym || !neural_.loaded())) {
+            std::string spelled;
+            for (char c : clean_word) spelled += arpabet_to_ipa(LETTER_NAMES[c - 'A']);
+            return prefix + spelled + suffix;
+        }
+
+        const bool word_chars = std::all_of(clean_word.begin(), clean_word.end(),
+                                            [&](unsigned char c) { return is_upper(c) || c == '\''; });
+        if (word_chars && neural_.loaded()) {
+            std::string lower = clean_word;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            return prefix + arpabet_to_ipa(neural_.predict(lower)) + suffix;
+        }
+
+        return word;
     }
 
 private:
     std::unordered_map<std::string, std::vector<std::string>> dict_;
-    std::unordered_map<std::string, std::string> arpabet_map_;
+    NeuralG2P neural_;
+    static constexpr size_t MAX_ACRONYM_LENGTH = 5;
 
-    void load_dict(const std::string& path) {
+    // English letter names in ARPAbet, A..Z.
+    inline static const std::vector<std::string> LETTER_NAMES[26] = {
+        {"EY1"}, {"B", "IY1"}, {"S", "IY1"}, {"D", "IY1"}, {"IY1"},
+        {"EH1", "F"}, {"JH", "IY1"}, {"EY1", "CH"}, {"AY1"}, {"JH", "EY1"},
+        {"K", "EY1"}, {"EH1", "L"}, {"EH1", "M"}, {"EH1", "N"}, {"OW1"},
+        {"P", "IY1"}, {"K", "Y", "UW1"}, {"AA1", "R"}, {"EH1", "S"}, {"T", "IY1"},
+        {"Y", "UW1"}, {"V", "IY1"}, {"D", "AH1", "B", "AH0", "L", "Y", "UW0"}, {"EH1", "K", "S"}, {"W", "AY1"},
+        {"Z", "IY1"}
+    };
+
+    // override=false: first variant wins and existing entries are kept (CMU dict).
+    // override=true: entries replace existing ones; first variant in this file wins.
+    void load_dict(const std::string& path, bool override) {
         std::ifstream file(path);
         if (!file.is_open()) {
-            // Silent fail or log?
-            std::cerr << "[EnG2P] Warning: Failed to open CMU dict: " << path << std::endl;
+            std::cerr << "[EnG2P] Warning: Failed to open dict: " << path << std::endl;
             return;
         }
+        std::unordered_set<std::string> seen;
         std::string line;
-        int count = 0;
+        size_t before = dict_.size();
         while (std::getline(file, line)) {
             if (line.empty()) continue;
             // CMU dict lines start with word, possibly with symbols like !EXCLAMATION-POINT
@@ -78,60 +120,46 @@ private:
                 phonemes.push_back(ph);
             }
             
-            // Only keep first variant if multiple exist (CMU dict is sorted, usually main first)
-            if (!dict_.count(word)) {
-                dict_[word] = phonemes;
-                count++;
-                // if (count < 5) std::cout << "Debug CMU: Loaded [" << word << "]" << std::endl;
+            if (override) {
+                if (seen.insert(word).second) dict_[word] = std::move(phonemes);
+            } else if (!dict_.count(word)) {
+                dict_[word] = std::move(phonemes);
             }
         }
-        std::cout << "[EnG2P] Loaded " << dict_.size() << " words from CMU dict." << std::endl;
-        
+        std::cout << "[EnG2P] Loaded " << (override ? seen.size() : dict_.size() - before)
+                  << " words from " << path << std::endl;
     }
 
-    void init_arpabet_map() {
-        // Mapping ARPABET to IPA
-        // Note: This is a simplified mapping.
-        // Stress: 1 (primary) -> ˈ, 2 (secondary) -> ˌ, 0 (unstressed) -> nothing/schwa
-        arpabet_map_ = {
-            {"AA0", "ɑ"}, {"AA1", "ˈɑ"}, {"AA2", "ˌɑ"},
-            {"AE0", "æ"}, {"AE1", "ˈæ"}, {"AE2", "ˌæ"},
-            {"AH0", "ə"}, {"AH1", "ˈʌ"}, {"AH2", "ˌʌ"},
-            {"AO0", "ɔ"}, {"AO1", "ˈɔ"}, {"AO2", "ˌɔ"},
-            {"AW0", "aʊ"}, {"AW1", "ˈaʊ"}, {"AW2", "ˌaʊ"},
-            {"AY0", "aɪ"}, {"AY1", "ˈaɪ"}, {"AY2", "ˌaɪ"},
-            {"B", "b"}, {"CH", "tʃ"}, {"D", "d"}, {"DH", "ð"},
-            {"EH0", "ɛ"}, {"EH1", "ˈɛ"}, {"EH2", "ˌɛ"},
-            {"ER0", "ɚ"}, {"ER1", "ˈɝ"}, {"ER2", "ˌɝ"},
-            {"EY0", "eɪ"}, {"EY1", "ˈeɪ"}, {"EY2", "ˌeɪ"},
-            {"F", "f"}, {"G", "ɡ"}, {"HH", "h"},
-            {"IH0", "ɪ"}, {"IH1", "ˈɪ"}, {"IH2", "ˌɪ"},
-            {"IY0", "i"}, {"IY1", "ˈi"}, {"IY2", "ˌi"},
-            {"JH", "dʒ"}, {"K", "k"}, {"L", "l"},
-            {"M", "m"}, {"N", "n"}, {"NG", "ŋ"},
-            {"OW0", "oʊ"}, {"OW1", "ˈoʊ"}, {"OW2", "ˌoʊ"},
-            {"OY0", "ɔɪ"}, {"OY1", "ˈɔɪ"}, {"OY2", "ˌɔɪ"},
-            {"P", "p"}, {"R", "r"}, {"S", "s"}, {"SH", "ʃ"},
-            {"T", "t"}, {"TH", "θ"},
-            {"UH0", "ʊ"}, {"UH1", "ˈʊ"}, {"UH2", "ˌʊ"},
-            {"UW0", "u"}, {"UW1", "ˈu"}, {"UW2", "ˌu"},
-            {"V", "v"}, {"W", "w"}, {"Y", "j"}, {"Z", "z"}, {"ZH", "ʒ"}
+    // ARPAbet -> Kokoro's English phoneme set (misaki, US; see
+    // https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md). Every output symbol must
+    // exist in dict/vocab.txt: Tokenizer::tokenize silently drops unknown symbols.
+    // Diphthongs use misaki's single-letter forms: A=eɪ, I=aɪ, O=oʊ, W=aʊ, Y=ɔɪ.
+    static std::string arpabet_to_ipa(const std::vector<std::string>& phonemes) {
+        static const std::unordered_map<std::string, const char*> MISAKI = {
+            {"AA", "ɑ"}, {"AE", "æ"}, {"AH", "ʌ"}, {"AO", "ɔ"}, {"AW", "W"}, {"AY", "I"},
+            {"B", "b"}, {"CH", "ʧ"}, {"D", "d"}, {"DH", "ð"}, {"EH", "ɛ"}, {"ER", "ɜɹ"},
+            {"EY", "A"}, {"F", "f"}, {"G", "ɡ"}, {"HH", "h"}, {"IH", "ɪ"}, {"IY", "i"},
+            {"JH", "ʤ"}, {"K", "k"}, {"L", "l"}, {"M", "m"}, {"N", "n"}, {"NG", "ŋ"},
+            {"OW", "O"}, {"OY", "Y"}, {"P", "p"}, {"R", "ɹ"}, {"S", "s"}, {"SH", "ʃ"},
+            {"T", "t"}, {"TH", "θ"}, {"UH", "ʊ"}, {"UW", "u"}, {"V", "v"}, {"W", "w"},
+            {"Y", "j"}, {"Z", "z"}, {"ZH", "ʒ"},
         };
-    }
-
-    std::string arpabet_to_ipa(const std::vector<std::string>& phonemes) {
         std::string res;
         for (const auto& p : phonemes) {
-            if (arpabet_map_.count(p)) {
-                res += arpabet_map_.at(p);
-            } else {
-                // Fallback: try removing digit
-                std::string base = p;
-                if (!base.empty() && isdigit(base.back())) base.pop_back();
-                if (arpabet_map_.count(base)) {
-                     res += arpabet_map_.at(base);
-                }
+            std::string base = p;
+            char stress = 0;
+            if (!base.empty() && isdigit(static_cast<unsigned char>(base.back()))) {
+                stress = base.back();
+                base.pop_back();
             }
+            auto it = MISAKI.find(base);
+            if (it == MISAKI.end()) continue;
+            if (stress == '1') res += "ˈ";
+            else if (stress == '2') res += "ˌ";
+            // Unstressed AH/ER reduce to schwa: "about" əbˈWt, "butter" bˈʌtəɹ.
+            if (stress == '0' && base == "AH") res += "ə";
+            else if (stress == '0' && base == "ER") res += "əɹ";
+            else res += it->second;
         }
         return res;
     }

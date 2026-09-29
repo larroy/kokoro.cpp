@@ -42,7 +42,13 @@ cmake --build build --config Release
 运行 `kokoro_demo` 可执行文件，指定模型、语音文件和输入文本。
 
 ```bash
-./kokoro_demo <模型路径> <语音文件路径> <"要朗读的文本">
+./kokoro_demo <模型路径> <语音文件路径> <"要朗读的文本"> [词表路径] [语音名称]
+```
+
+语音名称默认为 `zf_002`。英文语音：`af_maple`、`af_sol`、`bf_vale`，例如：
+
+```bash
+./build/kokoro_demo models/kokoro-v1.1-zh.onnx models/voices-v1.1-zh.bin "Hello world" dict/vocab.txt af_maple
 ```
 
 ### 示例
@@ -53,12 +59,28 @@ cmake --build build --config Release
 
 因为依赖相关词典，需要在项目根目录运行！ 输出的音频将保存为当前目录下的 `output.wav`。
 
+## 英文 G2P
+
+英文单词按以下顺序转换为音素（输出为 Kokoro/misaki 英文音素集）：
+
+1. `dict/user_en.dict`：用户词典，CMU 格式（`单词 ARPAbet音素`，如 `onnx AA1 N IH0 K S`），优先级最高，用于专有名词。
+2. `dict/cmudict-0.7b/cmudict.dict`：CMU 发音词典。
+3. 不超过 5 个字母的全大写词（如 `GPU`）按英文字母名拼读。
+4. 其他未登录词由 `dict/g2p_en.weights` 神经网络预测，移植自 [g2p_en](https://github.com/Kyubyong/g2p)（Apache-2.0，见 `dict/g2p_en.LICENSE.txt`）。
+
+`g2p_en.weights` 由 g2p_en 的 `checkpoint20.npz` 生成（无需 numpy）：
+
+```bash
+python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
+```
+
 ## 项目结构
 
 - `Kokoro.cpp/h`: 主要的 TTS 类。
 - `ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
+- `EnG2P.h`, `NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
 - `scripts/`: 数据处理辅助脚本。
-- `dict/`: G2P 字典文件（Jieba、拼音）。
+- `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
 
 ## 许可证
 

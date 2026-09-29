@@ -13,7 +13,9 @@
 class ZHG2P {
 public:
     // 构造函数注入文本处理器依赖
-    ZHG2P(std::shared_ptr<TextProcessor> processor, const std::string& version = "1.1", const std::string& unk = "<unk>", const std::string& eng_dict_path = "");
+    ZHG2P(std::shared_ptr<TextProcessor> processor, const std::string& version = "1.1", const std::string& unk = "<unk>",
+          const std::string& eng_dict_path = "", const std::string& eng_user_dict_path = "",
+          const std::string& eng_neural_model_path = "");
 
     // 主调用接口: 返回 (IPA字符串, 附加信息/None)
     std::pair<std::string, std::string> operator()(const std::string& text);

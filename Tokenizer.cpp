@@ -18,12 +18,14 @@ Tokenizer::Tokenizer(const TokenizerConfig& config, const std::map<std::string, 
     std::string pinyin_char = d + config.pinyin_char;
     std::string pinyin_phrase = d + config.pinyin_phrase;
     std::string cmu_dict = d + config.cmu_dict;
+    std::string user_en_dict = d + config.user_en_dict;
+    std::string g2p_en_model = d + config.g2p_en_model;
 
     try {
         processor_ = std::make_shared<JiebaProcessor>(
             jieba_dict, hmm_model, user_dict, idf_path, stop_word_path, pinyin_char, pinyin_phrase
         );
-        g2p_ = std::make_unique<ZHG2P>(processor_, "1.1", "<unk>", cmu_dict);
+        g2p_ = std::make_unique<ZHG2P>(processor_, "1.1", "<unk>", cmu_dict, user_en_dict, g2p_en_model);
     } catch (const std::exception& e) {
         std::cerr << "Failed to initialize Tokenizer dependencies: " << e.what() << std::endl;
     }

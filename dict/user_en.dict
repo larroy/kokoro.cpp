@@ -1,0 +1,4 @@
+# English pronunciations that override dict/cmudict-0.7b/cmudict.dict.
+# Format: word ARPABET phonemes with stress digits (0/1/2), one entry per line.
+kokoro K OW1 K OW0 R OW0
+onnx AA1 N IH0 K S

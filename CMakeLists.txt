@@ -151,6 +151,7 @@ set(LIB_SOURCES
     PinyinFinder.cpp
     ToneSandhi.cpp
     ZHFrontend.cpp
+    NeuralG2P.cpp
     missing_symbols.cpp
 )
 
