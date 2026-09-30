@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-24.04
+            arch: x64
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            arch: arm64
+          - name: macos-arm64
+            os: macos-15
+            arch: arm64
+          - name: windows-x64
+            os: windows-2025
+            arch: x64
+          - name: windows-arm64
+            os: windows-11-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          architecture: ${{ matrix.arch }}
+
+      - name: Install setup.py dependencies
+        run: python -m pip install click
+
+      - name: Cache model and voices
+        uses: actions/cache@v6
+        with:
+          path: models
+          key: kokoro-models-${{ hashFiles('setup.py') }}
+          restore-keys: kokoro-models-
+          enableCrossOsArchive: true
+
+      - name: Download ONNX Runtime, model and voices
+        run: python setup.py configure
+
+      - name: Locate MSVC
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vcvars = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -find 'VC\Auxiliary\Build\vcvarsall.bat' | Select-Object -First 1
+          if (-not $vcvars) { throw 'vcvarsall.bat not found' }
+          "VCVARSALL=$vcvars" >> $env:GITHUB_ENV
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call "%VCVARSALL%" ${{ matrix.arch }} || exit /b 1
+          python setup.py build
+
+      - name: Build
+        if: runner.os != 'Windows'
+        run: python setup.py build
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
