@@ -12,14 +12,14 @@ A high-performance, lightweight C++ inference implementation of the [Kokoro](htt
 ## Requirements
 
 - **CMake** (3.15+)
-- **Ninja** (recommended; `python setup.py build` uses it when it is in `PATH`)
+- **Ninja** (recommended; `uv run bootstrap.py build` uses it when it is in `PATH`)
 - **C++ compiler** (C++17 support required)
-- **Python 3** with [click](https://click.palletsprojects.com/) (`pip install click`) for `setup.py`
+- **[uv](https://docs.astral.sh/uv/)**: runs `bootstrap.py` and `voice_tool.py`, and installs their Python dependencies (Python 3.10+, click) into `.venv` on first use
 
 ## Setup
 
 ```bash
-python setup.py configure
+uv run bootstrap.py configure
 ```
 
 This downloads, verifying SHA-256 checksums:
@@ -27,15 +27,15 @@ This downloads, verifying SHA-256 checksums:
 - the prebuilt [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
 - the model `kokoro-v1.1-zh.onnx` and the voice pack `voices-v1.1-zh.bin` from this repository's [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) into `models/`.
 
-Files that are already present and up to date are skipped; `--force` downloads them again. The ONNX Runtime version and checksums are pinned in `setup.py`. To use another ONNX Runtime installation instead, skip `configure` and pass `-DONNXRUNTIME_ROOT=/path/to/onnxruntime` to CMake.
+Files that are already present and up to date are skipped; `--force` downloads them again. The ONNX Runtime version and checksums are pinned in `bootstrap.py`. To use another ONNX Runtime installation instead, skip `configure` and pass `-DONNXRUNTIME_ROOT=/path/to/onnxruntime` to CMake.
 
 ## Building
 
 ```bash
-python setup.py build
+uv run bootstrap.py build
 ```
 
-`build` runs the CMake configure and build steps with the Ninja generator. If `ninja` is not in `PATH` it prints a warning and falls back to CMake's default generator; passing `-G` after `--` overrides the choice. Options: `--build-dir` (default `build`), `--config` (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`; default `Release`), `-j/--jobs`. Arguments after `--` go to the CMake configure step, e.g. `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`. A build directory can't switch generators: delete it first if it was configured with another one. On Windows, Ninja needs the MSVC environment (run from a Developer Command Prompt). It is equivalent to:
+`build` runs the CMake configure and build steps with the Ninja generator. If `ninja` is not in `PATH` it prints a warning and falls back to CMake's default generator; passing `-G` after `--` overrides the choice. Options: `--build-dir` (default `build`), `--config` (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`; default `Release`), `-j/--jobs`. Arguments after `--` go to the CMake configure step, e.g. `uv run bootstrap.py build -- -DKOKORO_BUILD_TESTS=OFF`. A build directory can't switch generators: delete it first if it was configured with another one. On Windows, Ninja needs the MSVC environment (run from a Developer Command Prompt). It is equivalent to:
 
 ```bash
 cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -170,14 +170,14 @@ MIT
 ## 依赖环境
 
 - **CMake** (3.15+)
-- **Ninja**（推荐；`python setup.py build` 在 `PATH` 中找到它时使用）
+- **Ninja**（推荐；`uv run bootstrap.py build` 在 `PATH` 中找到它时使用）
 - **C++ 编译器** (需要支持 C++17)
-- **Python 3** 及 [click](https://click.palletsprojects.com/)（`pip install click`），用于 `setup.py`
+- **[uv](https://docs.astral.sh/uv/)**：用于运行 `bootstrap.py` 和 `voice_tool.py`，首次运行时会将其 Python 依赖（Python 3.10+、click）安装到 `.venv`
 
 ## 准备
 
 ```bash
-python setup.py configure
+uv run bootstrap.py configure
 ```
 
 该命令会下载以下文件并校验 SHA-256：
@@ -185,15 +185,15 @@ python setup.py configure
 - 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2（CPU 版），放入 `third_party/onnxruntime/`；
 - 模型 `kokoro-v1.1-zh.onnx` 和语音包 `voices-v1.1-zh.bin`，来自本仓库的 [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files)，放入 `models/`。
 
-已存在且校验一致的文件会被跳过；`--force` 强制重新下载。ONNX Runtime 版本和校验值固定在 `setup.py` 中。如需使用其他 ONNX Runtime，可跳过 `configure`，并向 CMake 传入 `-DONNXRUNTIME_ROOT=/path/to/onnxruntime`。
+已存在且校验一致的文件会被跳过；`--force` 强制重新下载。ONNX Runtime 版本和校验值固定在 `bootstrap.py` 中。如需使用其他 ONNX Runtime，可跳过 `configure`，并向 CMake 传入 `-DONNXRUNTIME_ROOT=/path/to/onnxruntime`。
 
 ## 编译
 
 ```bash
-python setup.py build
+uv run bootstrap.py build
 ```
 
-`build` 使用 Ninja 生成器执行 CMake 的配置和编译。若 `PATH` 中没有 `ninja`，会打印警告并回退到 CMake 默认生成器；在 `--` 之后传入 `-G` 可覆盖该选择。选项：`--build-dir`（默认 `build`）、`--config`（`Debug`、`Release`、`RelWithDebInfo`、`MinSizeRel`，默认 `Release`）、`-j/--jobs`。`--` 之后的参数会传给 CMake 配置步骤，例如 `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`。构建目录不能更换生成器：若之前用其他生成器配置过，需先删除。Windows 下 Ninja 需要 MSVC 环境（在 Developer Command Prompt 中运行）。等价于：
+`build` 使用 Ninja 生成器执行 CMake 的配置和编译。若 `PATH` 中没有 `ninja`，会打印警告并回退到 CMake 默认生成器；在 `--` 之后传入 `-G` 可覆盖该选择。选项：`--build-dir`（默认 `build`）、`--config`（`Debug`、`Release`、`RelWithDebInfo`、`MinSizeRel`，默认 `Release`）、`-j/--jobs`。`--` 之后的参数会传给 CMake 配置步骤，例如 `uv run bootstrap.py build -- -DKOKORO_BUILD_TESTS=OFF`。构建目录不能更换生成器：若之前用其他生成器配置过，需先删除。Windows 下 Ninja 需要 MSVC 环境（在 Developer Command Prompt 中运行）。等价于：
 
 ```bash
 cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -305,7 +305,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
 - `tests/`: 库测试（使用 `ctest` 运行）。
 <<<<<<< HEAD
-- `setup.py`: 下载依赖（`configure`）并运行 CMake（`build`）。
+- `bootstrap.py`: 下载依赖（`configure`）并运行 CMake（`build`）。
 =======
 - `docs/`: 使用指南（[添加语音](docs/adding-voices.md)）。
 >>>>>>> 5c019f4 (docs: add guide for adding voices)

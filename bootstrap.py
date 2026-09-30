@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Project setup tool.
 
-    python setup.py configure   # download ONNX Runtime, the model and the voices
-    python setup.py build       # run CMake
+    uv run bootstrap.py configure   # download ONNX Runtime, the model and the voices
+    uv run bootstrap.py build       # run CMake
 """
 
 import hashlib
@@ -195,7 +195,7 @@ def build(build_dir, config, jobs, cmake_args):
     """Configure and build with CMake, using the Ninja generator if available.
 
     Extra arguments after `--` are passed to the CMake configure step,
-    e.g. `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`.
+    e.g. `uv run bootstrap.py build -- -DKOKORO_BUILD_TESTS=OFF`.
     """
     cmake = shutil.which("cmake")
     if cmake is None:

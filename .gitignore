@@ -3,7 +3,7 @@ build/
 bin/
 out/
 models/
-# Downloaded by `python setup.py configure`
+# Downloaded by `uv run bootstrap.py configure`
 third_party/onnxruntime/
 # C++ compiled files
 *.o

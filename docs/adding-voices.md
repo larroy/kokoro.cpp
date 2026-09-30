@@ -4,8 +4,8 @@ Voices live in the voices file (`models/voices-v1.1-zh.bin` by default), not in 
 
 There are three ways to get a new voice:
 
-1. [Blend existing voices](#1-blend-existing-voices). Needs only Python 3.
-2. [Import a voice tensor](#2-import-a-voice-tensor-pt) (`.pt`), for example one downloaded from Hugging Face or produced by a voice-cloning tool. Needs PyTorch.
+1. [Blend existing voices](#1-blend-existing-voices). Needs only [uv](https://docs.astral.sh/uv/).
+2. [Import a voice tensor](#2-import-a-voice-tensor-pt) (`.pt`), for example one downloaded from Hugging Face or produced by a voice-cloning tool. Needs PyTorch, installed by uv's `voice` dependency group.
 3. [Make a voice from your own recordings](#3-a-voice-from-your-own-recordings). No official tool exists for this; see the notes below.
 
 ## What a voice is
@@ -42,106 +42,51 @@ How the loader (`Kokoro::load_voices`) treats the file:
 - Voices must be a whole number of 256-float rows, or loading fails.
 - Always write full 510 × 256 tables. With fewer rows, longer chunks all reuse the last row, which was made for a different length.
 
-## Helper: `voicebin.py`
+## `voice_tool.py`
 
-The examples below use this module to read and write voices files. It needs only the Python standard library. Save it as `voicebin.py` next to the script that imports it.
+`voice_tool.py` in the repository root reads a voices file, adds one voice to it, and writes the result. Every command takes:
+- `--voices <path>`: the voices file to start from (default: `models/voices-v1.1-zh.bin`)
+- `--name <name>`: name of the new voice; a voice with the same name is replaced
+- `-o, --output <path>`: the voices file to write (required)
 
-```python
-# voicebin.py: read and write kokoro.cpp voices files (docs/adding-voices.md).
-import struct
-import sys
-from array import array
+The output file keeps every voice from the input and adds the new one, so it can replace the default file. Don't overwrite the downloaded `voices-v1.1-zh.bin`; keep it as the source.
 
-ROWS, DIM = 510, 256
+To add several voices, pass the previous output back as `--voices`:
 
-
-def load(path):
-    """Returns {name: array('f')} for every voice in a voices file."""
-    voices = {}
-    with open(path, "rb") as f:
-        if f.read(4) != b"VOIC":
-            raise ValueError(f"{path}: not a kokoro.cpp voices file")
-        version, count = struct.unpack("<II", f.read(8))
-        if version != 1:
-            raise ValueError(f"{path}: unsupported voices file version {version}")
-        for _ in range(count):
-            (name_len,) = struct.unpack("<I", f.read(4))
-            name = f.read(name_len).decode("utf-8")
-            (n,) = struct.unpack("<I", f.read(4))
-            style = array("f")
-            style.frombytes(f.read(4 * n))
-            if sys.byteorder == "big":
-                style.byteswap()
-            voices[name] = style
-    return voices
-
-
-def save(path, voices):
-    """Writes {name: sequence of 510 * 256 floats} as a voices file."""
-    with open(path, "wb") as f:
-        f.write(b"VOIC" + struct.pack("<II", 1, len(voices)))
-        for name, style in voices.items():
-            data = array("f", style)
-            if len(data) != ROWS * DIM:
-                raise ValueError(f"{name}: expected {ROWS * DIM} floats, got {len(data)}")
-            if sys.byteorder == "big":
-                data.byteswap()
-            encoded = name.encode("utf-8")
-            f.write(struct.pack("<I", len(encoded)) + encoded + struct.pack("<I", len(data)))
-            f.write(data.tobytes())
+```bash
+uv run voice_tool.py blend --name af_maplevale -o models/voices-custom.bin af_maple:0.7 bf_vale:0.3
+uv run --group voice voice_tool.py import-pt --voices models/voices-custom.bin --name af_myvoice -o models/voices-custom.bin my_voice.pt
 ```
+
+The repository is a uv project (`pyproject.toml`): `uv run` installs the base dependencies (click) into `.venv` on first use. The heavy dependencies, PyTorch (CPU build) and NumPy, are in the `voice` dependency group; install them with `uv sync --group voice`, or pass `--group voice` to `uv run`.
 
 ## 1. Blend existing voices
 
 A weighted average of two or more voices gives a new voice somewhere between them. This is the same operation as upstream Kokoro's `KPipeline.load_voice("a,b")`, which takes the plain mean. Run from the repository root:
 
-```python
-from array import array
-
-import voicebin
-
-
-def blend(voices, weights):
-    """Weighted average of voices, e.g. {"af_maple": 0.7, "bf_vale": 0.3}."""
-    total = sum(weights.values())
-    out = array("f", bytes(4 * voicebin.ROWS * voicebin.DIM))
-    for name, weight in weights.items():
-        for i, x in enumerate(voices[name]):
-            out[i] += x * weight / total
-    return out
-
-
-voices = voicebin.load("models/voices-v1.1-zh.bin")
-voices["af_maplevale"] = blend(voices, {"af_maple": 0.7, "bf_vale": 0.3})
-voicebin.save("models/voices-custom.bin", voices)
+```bash
+uv run voice_tool.py blend --name af_maplevale -o models/voices-custom.bin af_maple:0.7 bf_vale:0.3
 ```
 
-The output file keeps every original voice and adds the new one, so it can replace the default file. Don't overwrite the downloaded `voices-v1.1-zh.bin`; keep it as the source.
+Each argument is `<voice>[:<weight>]`. The weight defaults to 1 and must be positive. Weights are normalized to sum to 1, so `af_maple bf_vale` is the plain mean.
 
 Voices can be blended across languages (for example `zf_002` with `af_maple`), but the result is less predictable. Listen to it before relying on it.
 
 ## 2. Import a voice tensor (`.pt`)
 
-Upstream Kokoro and tools built on it store each voice as a PyTorch tensor of shape `(510, 1, 256)`, saved as `<name>.pt`. Importing one needs `torch` (`pip install torch`):
+Upstream Kokoro and tools built on it store each voice as a PyTorch tensor of shape `(510, 1, 256)`, saved as `<name>.pt`. Importing one needs PyTorch from the `voice` group:
 
-```python
-from array import array
-
-import torch
-
-import voicebin
-
-voices = voicebin.load("models/voices-v1.1-zh.bin")
-tensor = torch.load("my_voice.pt", map_location="cpu", weights_only=True)
-voices["af_myvoice"] = array("f", tensor.float().flatten().tolist())
-voicebin.save("models/voices-custom.bin", voices)
+```bash
+uv run --group voice voice_tool.py import-pt --name af_myvoice -o models/voices-custom.bin my_voice.pt
 ```
+
+The tensor must hold 510 × 256 values; anything else is rejected.
 
 Where `.pt` voices come from:
 - **[Kokoro-82M-v1.1-zh `voices/`](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh/tree/main/voices).** These are the voices made for this model, and all 103 are already in the bundled voices file.
 - **Other Kokoro releases,** such as the v1.0 voices (`af_heart`, `am_adam`, …) in [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M/tree/main/voices). They have the same shape and load without errors, but they were made for different model weights. Expect the result to sound different from the upstream samples, and listen before relying on them.
 
-If you have a whole voice set as a NumPy file (a `.npy` dict or a `.npz` mapping names to arrays), `scripts/export_voices.py <voices.npy> <output.bin>` converts all of it in one go. It needs `numpy`, and it writes only the voices in its input, so include the bundled ones if you want to keep them.
+If you have a whole voice set as a NumPy file (a `.npy` dict or a `.npz` mapping names to arrays), `uv run --group voice scripts/export_voices.py <voices.npy> <output.bin>` converts all of it in one go. It needs NumPy (in the `voice` group), and it writes only the voices in its input, so include the bundled ones if you want to keep them.
 
 ## 3. A voice from your own recordings
 

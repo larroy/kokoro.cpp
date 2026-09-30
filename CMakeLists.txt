@@ -18,7 +18,7 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # ONNX Runtime Configuration
-# Priority 1: third_party/onnxruntime, downloaded by `python setup.py configure`
+# Priority 1: third_party/onnxruntime, downloaded by `uv run bootstrap.py configure`
 set(LOCAL_ONNX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime")
 if(EXISTS "${LOCAL_ONNX_PATH}")
     message(STATUS "Using local ONNX Runtime from: ${LOCAL_ONNX_PATH}")
@@ -52,7 +52,7 @@ find_library(ONNXRUNTIME_LIB onnxruntime
 )
 
 if (NOT (ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIB))
-    message(FATAL_ERROR "ONNX Runtime not found. Run `python setup.py configure`, or set ONNXRUNTIME_ROOT, e.g. cmake -DONNXRUNTIME_ROOT=/path/to/onnxruntime ..")
+    message(FATAL_ERROR "ONNX Runtime not found. Run `uv run bootstrap.py configure`, or set ONNXRUNTIME_ROOT, e.g. cmake -DONNXRUNTIME_ROOT=/path/to/onnxruntime ..")
 endif()
 message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
 
