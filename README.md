@@ -38,7 +38,15 @@ cmake -B build -S .
 cmake --build build --config Release
 ```
 
-This produces the shared library `kokoro` (`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`) and the `kokoro_demo` / `zhg2p_demo` executables. On Windows the bundled static ONNX Runtime is linked into `kokoro.dll`, so the DLL has no other runtime dependencies. On Linux/macOS, `libkokoro` links against the ONNX Runtime shared library, which must be findable at runtime.
+This produces the shared library `kokoro` (`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`) and the `kokoro` command-line tool. On Windows the bundled static ONNX Runtime is linked into `kokoro.dll`, so the DLL has no other runtime dependencies. On Linux/macOS, `libkokoro` links against the ONNX Runtime shared library, which must be findable at runtime.
+
+### Tests
+
+```bash
+ctest --test-dir build -C Release --output-on-failure
+```
+
+Tests live in `tests/` (doctest, vendored in `third_party/doctest`): `c_api` checks the C API without a model, `g2p` pins the Chinese/English G2P output, and `synthesis` runs the real model from `models/` (skipped if the model or voices file is missing). Configure with `-DKOKORO_BUILD_TESTS=OFF` to skip building them.
 
 ## Library
 
@@ -80,25 +88,34 @@ Alternatively, `add_subdirectory(kokoro.cpp)` and link `kokoro::kokoro`.
 
 ## Usage
 
-Run the `kokoro_demo` executable, specifying the model, the voice file, and the input text.
+Run the `kokoro` command-line tool from the project root (the defaults point at `models/` and `dict/`). With Visual Studio or another multi-config generator the executable is in `build/Release/`.
 
 ```bash
-./kokoro_demo <model_path> <voices_path> <"text to speak"> [dict_dir] [voice_name]
+./build/kokoro [options] <text>
+./build/kokoro --list-voices
 ```
 
-`dict_dir` defaults to `dict` and the voice name to `zf_002`. English voices: `af_maple`, `af_sol`, `bf_vale`. For example:
-
-```bash
-./build/kokoro_demo models/kokoro-v1.1-zh.onnx models/voices-v1.1-zh.bin "Hello world" dict af_maple
-```
+| Option | Meaning |
+|---|---|
+| `-m, --model <path>` | ONNX model file (default: `models/kokoro-v1.1-zh.onnx`) |
+| `--voices <path>` | voices file (default: `models/voices-v1.1-zh.bin`) |
+| `-d, --dict <dir>` | dictionary directory (default: `dict`) |
+| `-v, --voice <name>` | voice (default: `zf_002`); English voices: `af_maple`, `af_sol`, `bf_vale` |
+| `-s, --speed <rate>` | speaking rate, > 0 (default: `1.0`) |
+| `-o, --output <path>` | output WAV file (default: `output.wav`) |
+| `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
+| `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
+| `--list-voices` | print the available voices |
 
 ### Example
 
 ```bash
-./build/kokoro_demo models/kokoro-v1.1-zh.onnx models/voices-v1.1-zh.bin "你好啊，这是一个测试。Hello world"
+./build/kokoro "你好啊，这是一个测试。Hello world"
+./build/kokoro --voice af_maple -o hello.wav "Hello world"
+./build/kokoro --phonemize "中国"
 ```
 
-Run it from the project root or pass `dict_dir` explicitly. The output audio is saved as `output.wav` in the current directory.
+Output is a mono 32-bit float WAV at 24 kHz. Exit status is 0 on success, 1 on a library error, and 2 on a usage error.
 
 ## English G2P
 
@@ -117,10 +134,12 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 
 ## Project Structure
 
-- `include/kokoro/kokoro.h`, `kokoro_c.cpp`: public C API of `libkokoro`.
-- `Kokoro.cpp/h`: main TTS class (internal).
-- `ZHFrontend.cpp/h`: Chinese frontend (G2P, tone sandhi).
-- `EnG2P.h`, `NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
+- `include/kokoro/kokoro.h`, `src/kokoro_c.cpp`: public C API of `libkokoro`.
+- `src/cli/main.cpp`: the `kokoro` command-line tool.
+- `src/Kokoro.cpp/h`: main TTS class (internal).
+- `src/ZHFrontend.cpp/h`: Chinese frontend (G2P, tone sandhi).
+- `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
+- `tests/`: library tests (run with `ctest`).
 - `scripts/`: helper scripts for data processing.
 - `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
 
@@ -170,7 +189,15 @@ cmake -B build -S .
 cmake --build build --config Release
 ```
 
-编译产物为共享库 `kokoro`（`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`）以及 `kokoro_demo` / `zhg2p_demo` 可执行文件。Windows 下内置的静态 ONNX Runtime 会被链接进 `kokoro.dll`，DLL 不依赖其他运行库；Linux/macOS 下 `libkokoro` 链接 ONNX Runtime 共享库，运行时需能找到它。
+编译产物为共享库 `kokoro`（`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`）以及 `kokoro` 命令行工具。Windows 下内置的静态 ONNX Runtime 会被链接进 `kokoro.dll`，DLL 不依赖其他运行库；Linux/macOS 下 `libkokoro` 链接 ONNX Runtime 共享库，运行时需能找到它。
+
+### 测试
+
+```bash
+ctest --test-dir build -C Release --output-on-failure
+```
+
+测试位于 `tests/`（使用 doctest，已内置于 `third_party/doctest`）：`c_api` 在无模型的情况下检查 C API，`g2p` 固定中英文 G2P 的输出，`synthesis` 使用 `models/` 中的真实模型运行（模型或语音文件不存在时跳过）。配置时传入 `-DKOKORO_BUILD_TESTS=OFF` 可不编译测试。
 
 ## 库
 
@@ -212,25 +239,34 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 
 ## 使用方法
 
-运行 `kokoro_demo` 可执行文件，指定模型、语音文件和输入文本。
+在项目根目录运行 `kokoro` 命令行工具（默认路径指向 `models/` 和 `dict/`）。使用 Visual Studio 等多配置生成器时，可执行文件位于 `build/Release/`。
 
 ```bash
-./kokoro_demo <模型路径> <语音文件路径> <"要朗读的文本"> [词典目录] [语音名称]
+./build/kokoro [选项] <文本>
+./build/kokoro --list-voices
 ```
 
-词典目录默认为 `dict`，语音名称默认为 `zf_002`。英文语音：`af_maple`、`af_sol`、`bf_vale`，例如：
-
-```bash
-./build/kokoro_demo models/kokoro-v1.1-zh.onnx models/voices-v1.1-zh.bin "Hello world" dict af_maple
-```
+| 选项 | 含义 |
+|---|---|
+| `-m, --model <路径>` | ONNX 模型文件（默认：`models/kokoro-v1.1-zh.onnx`） |
+| `--voices <路径>` | 语音文件（默认：`models/voices-v1.1-zh.bin`） |
+| `-d, --dict <目录>` | 词典目录（默认：`dict`） |
+| `-v, --voice <名称>` | 语音（默认：`zf_002`）；英文语音：`af_maple`、`af_sol`、`bf_vale` |
+| `-s, --speed <语速>` | 语速，须 > 0（默认：`1.0`） |
+| `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
+| `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
+| `--phonemize` | 输出 `<文本>` 的音素而不合成 |
+| `--list-voices` | 列出可用语音 |
 
 ### 示例
 
 ```bash
-./build/kokoro_demo models/kokoro-v1.1-zh.onnx models/voices-v1.1-zh.bin "你好啊，这是一个测试。Hello world"
+./build/kokoro "你好啊，这是一个测试。Hello world"
+./build/kokoro --voice af_maple -o hello.wav "Hello world"
+./build/kokoro --phonemize "中国"
 ```
 
-请在项目根目录运行，或显式传入词典目录。输出的音频将保存为当前目录下的 `output.wav`。
+输出为 24 kHz 单声道 32 位浮点 WAV。成功时退出码为 0，库错误为 1，用法错误为 2。
 
 ## 英文 G2P
 
@@ -249,10 +285,12 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 
 ## 项目结构
 
-- `include/kokoro/kokoro.h`, `kokoro_c.cpp`: `libkokoro` 的公共 C API。
-- `Kokoro.cpp/h`: 主要的 TTS 类（内部实现）。
-- `ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
-- `EnG2P.h`, `NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
+- `include/kokoro/kokoro.h`, `src/kokoro_c.cpp`: `libkokoro` 的公共 C API。
+- `src/cli/main.cpp`: `kokoro` 命令行工具。
+- `src/Kokoro.cpp/h`: 主要的 TTS 类（内部实现）。
+- `src/ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
+- `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
+- `tests/`: 库测试（使用 `ctest` 运行）。
 - `scripts/`: 数据处理辅助脚本。
 - `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
 

@@ -125,25 +125,25 @@ if (NOT (ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIB))
 endif()
 message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
 
-# Internal implementation, linked into libkokoro and the G2P demo.
+# Internal implementation, linked into libkokoro and test_g2p.
 add_library(kokoro_core STATIC
-    Kokoro.cpp
-    Tokenizer.cpp
-    ZHG2P.cpp
-    PinyinFinder.cpp
-    ToneSandhi.cpp
-    ZHFrontend.cpp
-    NeuralG2P.cpp
+    src/Kokoro.cpp
+    src/Tokenizer.cpp
+    src/ZHG2P.cpp
+    src/PinyinFinder.cpp
+    src/ToneSandhi.cpp
+    src/ZHFrontend.cpp
+    src/NeuralG2P.cpp
 )
 target_include_directories(kokoro_core PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cppjieba/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cppjieba/deps/limonp/include
     ${ONNXRUNTIME_INCLUDE_DIR}
 )
 
 # Public shared library: C API from include/kokoro/kokoro.h.
-add_library(kokoro SHARED kokoro_c.cpp)
+add_library(kokoro SHARED src/kokoro_c.cpp)
 add_library(kokoro::kokoro ALIAS kokoro)
 target_include_directories(kokoro PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -167,12 +167,22 @@ elseif (UNIX)
     set_target_properties(kokoro PROPERTIES INSTALL_RPATH "$ORIGIN")
 endif()
 
-# Demo Executables
-add_executable(zhg2p_demo main.cpp)
-target_link_libraries(zhg2p_demo PRIVATE kokoro_core)
-
-add_executable(kokoro_demo kokoro_main.cpp)
-target_link_libraries(kokoro_demo PRIVATE kokoro)
+# Command-line tool. Target name differs from the library; the executable is still named `kokoro`.
+add_executable(kokoro_cli src/cli/main.cpp)
+target_link_libraries(kokoro_cli PRIVATE kokoro)
+set_target_properties(kokoro_cli PROPERTIES OUTPUT_NAME kokoro)
+if (WIN32)
+    target_link_libraries(kokoro_cli PRIVATE Shell32)   # CommandLineToArgvW
+endif()
+if (MSVC)
+    # kokoro.exe and kokoro.dll share an output directory: keep their .pdb/.ilk apart.
+    set_target_properties(kokoro_cli PROPERTIES PDB_NAME kokoro_cli)
+    target_link_options(kokoro_cli PRIVATE "/INCREMENTAL:NO")
+elseif (APPLE)
+    set_target_properties(kokoro_cli PROPERTIES INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+elseif (UNIX)
+    set_target_properties(kokoro_cli PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()
 
 # Install: headers, libkokoro and a CMake package (find_package(kokoro) -> kokoro::kokoro).
 install(TARGETS kokoro EXPORT kokoroTargets
@@ -180,6 +190,7 @@ install(TARGETS kokoro EXPORT kokoroTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
+install(TARGETS kokoro_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY include/kokoro DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT kokoroTargets NAMESPACE kokoro:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kokoro)
 
@@ -192,4 +203,15 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/kokoroConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/kokoro
 )
+
+if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(KOKORO_IS_TOP_LEVEL ON)
+else()
+    set(KOKORO_IS_TOP_LEVEL OFF)
+endif()
+option(KOKORO_BUILD_TESTS "Build the kokoro tests" ${KOKORO_IS_TOP_LEVEL})
+if (KOKORO_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 

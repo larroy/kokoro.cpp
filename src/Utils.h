@@ -10,11 +10,6 @@
 // 简单的日志宏替代 absl/log
 #define LOG_INFO std::cout << "[INFO] "
 #define LOG_WARNING std::cerr << "[WARN] "
-#define CHECK(condition) \
-    if (!(condition)) { \
-        std::cerr << "[FATAL] Check failed: " << #condition << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-        std::terminate(); \
-    }
 
 namespace BasicStringUtil {
 
