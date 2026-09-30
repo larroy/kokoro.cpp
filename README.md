@@ -1,4 +1,5 @@
 # Kokoro C++ Inference
+[![CI](https://github.com/larroy/kokoro.cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/larroy/kokoro.cpp/actions/workflows/ci.yml)
 
 English | [中文](#kokoro-c-推理)
 
