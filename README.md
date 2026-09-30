@@ -55,6 +55,39 @@ Tests live in `tests/` (doctest, vendored in `third_party/doctest`): `c_api` che
 
 The Python tools have their own tests in `tests/python/`: run `uv run pytest`. The `.pt` import tests are skipped unless PyTorch is installed; `uv run --group voice pytest` runs them too.
 
+## Usage / Demo
+
+Run the `kokoro` command-line tool from the project root (the defaults point at `models/` and `dict/`). With Visual Studio or another multi-config generator the executable is in `build/Release/`.
+
+```bash
+./build/kokoro [options] <text>
+./build/kokoro --list-voices
+```
+
+| Option | Meaning |
+|---|---|
+| `-m, --model <path>` | ONNX model file (default: `models/kokoro-v1.1-zh.onnx`) |
+| `--voices <path>` | voices file (default: `models/voices-v1.1-zh.bin`) |
+| `-d, --dict <dir>` | dictionary directory (default: `dict`) |
+| `-v, --voice <name>` | voice (default: `af_maple`); English voices: `af_maple`, `af_sol`, `bf_vale`; Chinese voices: `zf_*`, `zm_*` |
+| `-s, --speed <rate>` | speaking rate, > 0 (default: `1.0`) |
+| `-o, --output <path>` | output WAV file (default: `output.wav`) |
+| `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
+| `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
+| `--list-voices` | print the available voices |
+
+To add your own voices (blends, imported `.pt` tensors), see [docs/adding-voices.md](docs/adding-voices.md).
+
+### Example
+
+```bash
+./build/kokoro -o hello.wav "Hello world"
+./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
+./build/kokoro --phonemize "中国"
+```
+
+Output is a mono 32-bit float WAV at 24 kHz. Exit status is 0 on success, 1 on a library error, and 2 on a usage error.
+
 ## Library
 
 `libkokoro` exposes a C API in [`include/kokoro/kokoro.h`](include/kokoro/kokoro.h), so it can be used from C, C++ or any language with a C FFI (Python `ctypes`, C#, Rust, Go, ...):
@@ -92,39 +125,6 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 ```
 
 Alternatively, `add_subdirectory(kokoro.cpp)` and link `kokoro::kokoro`.
-
-## Usage
-
-Run the `kokoro` command-line tool from the project root (the defaults point at `models/` and `dict/`). With Visual Studio or another multi-config generator the executable is in `build/Release/`.
-
-```bash
-./build/kokoro [options] <text>
-./build/kokoro --list-voices
-```
-
-| Option | Meaning |
-|---|---|
-| `-m, --model <path>` | ONNX model file (default: `models/kokoro-v1.1-zh.onnx`) |
-| `--voices <path>` | voices file (default: `models/voices-v1.1-zh.bin`) |
-| `-d, --dict <dir>` | dictionary directory (default: `dict`) |
-| `-v, --voice <name>` | voice (default: `af_maple`); English voices: `af_maple`, `af_sol`, `bf_vale`; Chinese voices: `zf_*`, `zm_*` |
-| `-s, --speed <rate>` | speaking rate, > 0 (default: `1.0`) |
-| `-o, --output <path>` | output WAV file (default: `output.wav`) |
-| `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
-| `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
-| `--list-voices` | print the available voices |
-
-To add your own voices (blends, imported `.pt` tensors), see [docs/adding-voices.md](docs/adding-voices.md).
-
-### Example
-
-```bash
-./build/kokoro -o hello.wav "Hello world"
-./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
-./build/kokoro --phonemize "中国"
-```
-
-Output is a mono 32-bit float WAV at 24 kHz. Exit status is 0 on success, 1 on a library error, and 2 on a usage error.
 
 ## English G2P
 
@@ -215,6 +215,39 @@ ctest --test-dir build -C Release --output-on-failure
 
 Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` 导入测试在未安装 PyTorch 时跳过；`uv run --group voice pytest` 会一并运行。
 
+## 使用方法
+
+在项目根目录运行 `kokoro` 命令行工具（默认路径指向 `models/` 和 `dict/`）。使用 Visual Studio 等多配置生成器时，可执行文件位于 `build/Release/`。
+
+```bash
+./build/kokoro [选项] <文本>
+./build/kokoro --list-voices
+```
+
+| 选项 | 含义 |
+|---|---|
+| `-m, --model <路径>` | ONNX 模型文件（默认：`models/kokoro-v1.1-zh.onnx`） |
+| `--voices <路径>` | 语音文件（默认：`models/voices-v1.1-zh.bin`） |
+| `-d, --dict <目录>` | 词典目录（默认：`dict`） |
+| `-v, --voice <名称>` | 语音（默认：`af_maple`）；英文语音：`af_maple`、`af_sol`、`bf_vale`；中文语音：`zf_*`、`zm_*` |
+| `-s, --speed <语速>` | 语速，须 > 0（默认：`1.0`） |
+| `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
+| `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
+| `--phonemize` | 输出 `<文本>` 的音素而不合成 |
+| `--list-voices` | 列出可用语音 |
+
+如需添加自定义语音（混合语音、导入 `.pt` 张量），请参阅 [docs/adding-voices.md](docs/adding-voices.md)（英文）。
+
+### 示例
+
+```bash
+./build/kokoro -o hello.wav "Hello world"
+./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
+./build/kokoro --phonemize "中国"
+```
+
+输出为 24 kHz 单声道 32 位浮点 WAV。成功时退出码为 0，库错误为 1，用法错误为 2。
+
 ## 库
 
 `libkokoro` 在 [`include/kokoro/kokoro.h`](include/kokoro/kokoro.h) 中提供 C API，可在 C、C++ 以及任何支持 C FFI 的语言（Python `ctypes`、C#、Rust、Go 等）中使用：
@@ -253,39 +286,6 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 
 也可以 `add_subdirectory(kokoro.cpp)` 后链接 `kokoro::kokoro`。
 
-## 使用方法
-
-在项目根目录运行 `kokoro` 命令行工具（默认路径指向 `models/` 和 `dict/`）。使用 Visual Studio 等多配置生成器时，可执行文件位于 `build/Release/`。
-
-```bash
-./build/kokoro [选项] <文本>
-./build/kokoro --list-voices
-```
-
-| 选项 | 含义 |
-|---|---|
-| `-m, --model <路径>` | ONNX 模型文件（默认：`models/kokoro-v1.1-zh.onnx`） |
-| `--voices <路径>` | 语音文件（默认：`models/voices-v1.1-zh.bin`） |
-| `-d, --dict <目录>` | 词典目录（默认：`dict`） |
-| `-v, --voice <名称>` | 语音（默认：`af_maple`）；英文语音：`af_maple`、`af_sol`、`bf_vale`；中文语音：`zf_*`、`zm_*` |
-| `-s, --speed <语速>` | 语速，须 > 0（默认：`1.0`） |
-| `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
-| `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
-| `--phonemize` | 输出 `<文本>` 的音素而不合成 |
-| `--list-voices` | 列出可用语音 |
-
-如需添加自定义语音（混合语音、导入 `.pt` 张量），请参阅 [docs/adding-voices.md](docs/adding-voices.md)（英文）。
-
-### 示例
-
-```bash
-./build/kokoro -o hello.wav "Hello world"
-./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
-./build/kokoro --phonemize "中国"
-```
-
-输出为 24 kHz 单声道 32 位浮点 WAV。成功时退出码为 0，库错误为 1，用法错误为 2。
-
 ## 英文 G2P
 
 英文单词按以下顺序转换为音素（输出为 Kokoro/misaki 英文音素集）：
@@ -309,11 +309,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
 - `tests/`: 库测试（使用 `ctest` 运行）；`tests/python/`：Python 工具的测试（使用 `uv run pytest` 运行）。
-<<<<<<< HEAD
-- `bootstrap.py`: 下载依赖（`configure`）并运行 CMake（`build`）。
-=======
 - `docs/`: 使用指南（[添加语音](docs/adding-voices.md)）。
->>>>>>> 5c019f4 (docs: add guide for adding voices)
 - `scripts/`: 数据处理辅助脚本。
 - `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
 
