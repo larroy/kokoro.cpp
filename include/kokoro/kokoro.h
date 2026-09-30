@@ -41,6 +41,13 @@ typedef enum kokoro_status {
 /* kokoro_synthesize flags. */
 #define KOKORO_INPUT_PHONEMES 0x1u /* text is already a phoneme string; skip G2P */
 
+/* How G2P reads digits (see kokoro_set_number_language). */
+typedef enum kokoro_number_language {
+    KOKORO_NUMBERS_AUTO = 0,    /* per number: language of the nearest letter or CJK character; Chinese if none */
+    KOKORO_NUMBERS_ENGLISH = 1,
+    KOKORO_NUMBERS_CHINESE = 2
+} kokoro_number_language;
+
 typedef struct kokoro_ctx kokoro_ctx;
 
 /* Mono float PCM owned by the library; release with kokoro_audio_free(). */
@@ -87,6 +94,9 @@ KOKORO_API kokoro_status kokoro_synthesize(kokoro_ctx* ctx, const char* text, co
 
 /* Converts text to the phoneme string the model consumes. Release with kokoro_string_free(). */
 KOKORO_API kokoro_status kokoro_phonemize(kokoro_ctx* ctx, const char* text, char** out_phonemes);
+
+/* Sets how digits are read by later kokoro_synthesize/kokoro_phonemize calls on ctx. Default: KOKORO_NUMBERS_AUTO. */
+KOKORO_API kokoro_status kokoro_set_number_language(kokoro_ctx* ctx, kokoro_number_language language);
 
 /* Frees samples and zeroes *audio. NULL is ignored. */
 KOKORO_API void kokoro_audio_free(kokoro_audio* audio);

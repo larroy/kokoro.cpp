@@ -127,6 +127,19 @@ kokoro_status kokoro_phonemize(kokoro_ctx* ctx, const char* text, char** out_pho
     return KOKORO_OK;
 }
 
+kokoro_status kokoro_set_number_language(kokoro_ctx* ctx, kokoro_number_language language) {
+    if (!ctx) return fail(KOKORO_ERROR_INVALID_ARGUMENT, "ctx is NULL");
+    NumberLanguage lang;
+    switch (language) {
+        case KOKORO_NUMBERS_AUTO:    lang = NumberLanguage::Auto;    break;
+        case KOKORO_NUMBERS_ENGLISH: lang = NumberLanguage::English; break;
+        case KOKORO_NUMBERS_CHINESE: lang = NumberLanguage::Chinese; break;
+        default: return fail(KOKORO_ERROR_INVALID_ARGUMENT, "unknown number language");
+    }
+    ctx->tts.set_number_language(lang);
+    return KOKORO_OK;
+}
+
 void kokoro_audio_free(kokoro_audio* audio) {
     if (!audio) return;
     std::free(audio->samples);

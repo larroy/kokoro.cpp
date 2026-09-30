@@ -134,6 +134,25 @@ TEST_CASE("synthesize_produces_audio") {
     CHECK(audio.num_samples == 0);
 }
 
+TEST_CASE("number_language_selects_reading") {
+    char* phonemes = nullptr;
+    REQUIRE(kokoro_phonemize(g_ctx, "I have 3 apples", &phonemes) == KOKORO_OK);
+    const std::string english = phonemes;
+    kokoro_string_free(phonemes);
+    CHECK(english.find("θɹˈi") != std::string::npos);
+
+    REQUIRE(kokoro_set_number_language(g_ctx, KOKORO_NUMBERS_CHINESE) == KOKORO_OK);
+    REQUIRE(kokoro_phonemize(g_ctx, "I have 3 apples", &phonemes) == KOKORO_OK);
+    const std::string chinese = phonemes;
+    kokoro_string_free(phonemes);
+    CHECK(chinese.find("sa→n") != std::string::npos);
+    CHECK(chinese.find("θɹˈi") == std::string::npos);
+
+    CHECK(kokoro_set_number_language(g_ctx, static_cast<kokoro_number_language>(7)) == KOKORO_ERROR_INVALID_ARGUMENT);
+
+    REQUIRE(kokoro_set_number_language(g_ctx, KOKORO_NUMBERS_AUTO) == KOKORO_OK);
+}
+
 TEST_CASE("phoneme_input_matches_text_input") {
     kokoro_status text_status = KOKORO_ERROR_UNKNOWN;
     const std::vector<float> from_text = synth("你好", kVoice, 1.0f, 0, &text_status);

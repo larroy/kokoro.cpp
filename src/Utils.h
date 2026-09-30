@@ -281,5 +281,4 @@ public:
     // Return pairs of (word, pos_tag)
     virtual std::vector<std::pair<std::string, std::string>> cut(const std::string& text) = 0;
     virtual std::vector<std::string> word_to_pinyin(const std::string& word) = 0;
-    virtual std::string convert_numbers(const std::string& text) = 0;
 };

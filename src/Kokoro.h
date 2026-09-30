@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <onnxruntime_cxx_api.h>
+#include "NumberNormalizer.h"
 
 // Forward declarations or placeholder for dependencies
 class Tokenizer;
@@ -60,6 +61,9 @@ public:
      *  \return Phoneme string suitable for create(..., is_phonemes=true).
      */
     std::string phonemize(const std::string& text);
+
+    // How G2P reads digits in later phonemize()/create() calls.
+    void set_number_language(NumberLanguage language);
 
     /** \brief Synthesizes audio from text using a named voice.
      *

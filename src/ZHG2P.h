@@ -7,6 +7,7 @@
 #include "Utils.h"
 #include "ZHFrontend.h"
 #include "EnG2P.h"
+#include "NumberNormalizer.h"
 
 // ZHG2P class definition...
 
@@ -37,12 +38,15 @@ public:
 
     bool is_chinese(const std::string& str);
 
+    void set_number_language(NumberLanguage language) { number_language_ = language; }
+
 private:
     std::string version;
     std::string unk;
     std::shared_ptr<TextProcessor> processor;
     std::unique_ptr<ZHFrontend> frontend;
     std::unique_ptr<EnG2P> eng_g2p;
+    NumberLanguage number_language_ = NumberLanguage::Auto;
 
     // IPA 转换相关的内部结构
     static std::string pinyin_to_ipa_convert(const std::string& pinyin);

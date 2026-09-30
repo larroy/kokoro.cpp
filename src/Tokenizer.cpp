@@ -62,5 +62,9 @@ std::vector<int> Tokenizer::tokenize(const std::string& phonemes) {
 
 std::string Tokenizer::phonemize(const std::string& text, bool norm) {
     auto result = (*g2p_)(text);
-    return result.first; 
+    return result.first;
+}
+
+void Tokenizer::set_number_language(NumberLanguage language) {
+    if (g2p_) g2p_->set_number_language(language);
 }

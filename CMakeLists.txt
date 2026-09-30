@@ -75,6 +75,7 @@ add_library(kokoro_core STATIC
     src/Kokoro.cpp
     src/Tokenizer.cpp
     src/ZHG2P.cpp
+    src/NumberNormalizer.cpp
     src/PinyinFinder.cpp
     src/ToneSandhi.cpp
     src/ZHFrontend.cpp

@@ -142,6 +142,10 @@ std::string Kokoro::phonemize(const std::string& text) {
     return tokenizer_->phonemize(text);
 }
 
+void Kokoro::set_number_language(NumberLanguage language) {
+    if (tokenizer_) tokenizer_->set_number_language(language);
+}
+
 std::vector<std::string> Kokoro::_split_phonemes(const std::string& phonemes) {
     std::vector<std::string> batches;
     std::regex re("([.,!?;])");

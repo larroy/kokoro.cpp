@@ -5,6 +5,7 @@
 #include <doctest/doctest.h>
 
 #include "JiebaProcessor.h"
+#include "NumberNormalizer.h"
 #include "Tokenizer.h"
 #include "ZHG2P.h"
 
@@ -47,8 +48,63 @@ TEST_CASE("number_conversion") {
     for (const Case& c : cases) {
         const std::string input = c.input;
         CAPTURE(input);
-        CHECK(g_proc->convert_numbers(input) == std::string(c.expected));
+        CHECK(normalize_numbers(input, NumberLanguage::Auto) == std::string(c.expected));
     }
+}
+
+TEST_CASE("number_conversion_english") {
+    struct NumCase {
+        const char* input;
+        const char* expected;
+    };
+    static const NumCase cases[] = {
+        {"0", "zero"},
+        {"12", "twelve"},
+        {"25", "twenty five"},
+        {"105", "one hundred five"},
+        {"2024", "two thousand twenty four"},
+        {"1200007", "one million two hundred thousand seven"},
+        {"007", "seven"},
+        {"-5", "minus five"},
+        {"3.14", "three point one four"},
+        {"192.168.0.1", "one nine two dot one six eight dot zero dot one"},
+        {"1234567890123456",
+         "one two three four five six seven eight nine zero one two three four five six"},
+        {"我有3个", "我有three个"},
+    };
+    for (const NumCase& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(normalize_numbers(input, NumberLanguage::English) == std::string(c.expected));
+    }
+}
+
+TEST_CASE("number_language_auto_and_forced") {
+    struct NumCase {
+        const char* input;
+        NumberLanguage language;
+        const char* expected;
+    };
+    static const NumCase cases[] = {
+        {"I have 3 apples", NumberLanguage::Auto, "I have three apples"},
+        {"3 apples", NumberLanguage::Auto, "three apples"},
+        {"我有3个 apples", NumberLanguage::Auto, "我有三个 apples"},
+        {"IPV4地址是192.168.0.1", NumberLanguage::Auto, "IPV four地址是一九二点一六八点零点一"},
+        {"I have 3 apples", NumberLanguage::Chinese, "I have 三 apples"},
+    };
+    for (const NumCase& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(normalize_numbers(input, c.language) == std::string(c.expected));
+    }
+}
+
+TEST_CASE("single_letter_words") {
+    static const Case cases[] = {
+        {"I am here. You and I.", "ˈI ˈæm hˈiɹ. jˈu ənd ˈI."},
+        {"saw a cat.", "sˈɔ ə kˈæt."},
+    };
+    check_g2p(cases);
 }
 
 TEST_CASE("mixed_language") {
@@ -78,7 +134,9 @@ TEST_CASE("numbers_in_text") {
         {"我有123块钱", "wo↓jou̯↓i↘pai̯↓ɚ↘ʂɨ↗sa→nkʰwai̯↘ʨʰjɛ↗n"},
         {"今天气温-5度", "ʨi→ntʰjɛ→nʨʰi↘wə→nfu↘u↓tu↘"},
         {"圆周率是3.14159", "ɥɛ↗nʈʂou̯→ly↘ʂɨ↘sa→ntjɛ↓ni→sɨ↘i→u↗ʨiu"},
-        {"IPV4地址是192.168.0.1", "ˈIpˈivˈi sɨ↘ti↘ʈʂɨ↓ʂɨ↘i→ʨiuɚ↘tjɛ↓ni→liupa→tjɛ↓nli↗ŋtjɛ↓ni→"},
+        {"IPV4地址是192.168.0.1", "ˈIpˈivˈi fˈɔɹ ti↘ʈʂɨ↓ʂɨ↘i→ʨiuɚ↘tjɛ↓ni→liupa→tjɛ↓nli↗ŋtjɛ↓ni→"},
+        {"I have 3 apples and 25 pears in 2024.",
+         "ˈI hˈæv θɹˈi ˈæpəlz ənd twˈɛnti fˈIv pˈɛɹz ɪn tˈu θˈWzənd twˈɛnti fˈɔɹ."},
     };
     check_g2p(cases);
 }

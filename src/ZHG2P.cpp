@@ -321,10 +321,7 @@ std::string ZHG2P::legacy_call(const std::string& text) {
 std::pair<std::string, std::string> ZHG2P::operator()(const std::string& text) {
     if (text.empty()) return {"", ""};
 
-    std::string processed_text = text;
-    if (processor) {
-        processed_text = processor->convert_numbers(processed_text);
-    }
+    std::string processed_text = normalize_numbers(text, number_language_);
     processed_text = map_punctuation(processed_text);
 
     // Default to legacy_call for now as we don't have the 1.1 frontend ported

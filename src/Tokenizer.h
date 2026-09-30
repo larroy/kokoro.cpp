@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include "NumberNormalizer.h"
 
 class ZHG2P;
 class JiebaProcessor;
@@ -28,6 +29,9 @@ public:
     
     std::vector<int> tokenize(const std::string& phonemes);
     std::string phonemize(const std::string& text, bool norm = true);
+
+    // How G2P reads digits in later phonemize() calls.
+    void set_number_language(NumberLanguage language);
 
 private:
     std::map<std::string, int> vocab_;

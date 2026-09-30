@@ -23,6 +23,7 @@ struct Options {
     std::string dict = "dict";
     std::string voice = "af_maple";
     float speed = 1.0f;
+    kokoro_number_language number_language = KOKORO_NUMBERS_AUTO;  // --lang
     std::string output = "output.wav";
     bool input_phonemes = false;  // -p/--phonemes
     bool phonemize = false;       // --phonemize
@@ -34,7 +35,7 @@ struct Options {
     std::string text;
 };
 
-enum class Opt { Model, Voices, Dict, Voice, Speed, Output, Phonemes, Phonemize, ListVoices, Interactive, Help, Version };
+enum class Opt { Model, Voices, Dict, Voice, Lang, Speed, Output, Phonemes, Phonemize, ListVoices, Interactive, Help, Version };
 
 struct OptionSpec {
     const char* short_name;  // nullptr if the option has no short form
@@ -48,6 +49,7 @@ constexpr OptionSpec kOptions[] = {
     {nullptr, "--voices", Opt::Voices, true},
     {"-d", "--dict", Opt::Dict, true},
     {"-v", "--voice", Opt::Voice, true},
+    {nullptr, "--lang", Opt::Lang, true},
     {"-s", "--speed", Opt::Speed, true},
     {"-o", "--output", Opt::Output, true},
     {"-p", "--phonemes", Opt::Phonemes, false},
@@ -78,6 +80,7 @@ void print_usage(std::FILE* out) {
         "      --voices <path>   voices file (default: models/voices-v1.1-zh.bin)\n"
         "  -d, --dict <dir>      dictionary directory (default: dict)\n"
         "  -v, --voice <name>    voice to use (default: af_maple)\n"
+        "      --lang <auto|en|zh>  language for reading numbers (default: auto)\n"
         "  -s, --speed <rate>    speaking rate, > 0 (default: 1.0)\n"
         "  -o, --output <path>   output WAV file (default: output.wav; unused with -i)\n"
         "  -p, --phonemes        <text> is a phoneme string; skip G2P\n"
@@ -91,6 +94,14 @@ void print_usage(std::FILE* out) {
 
 bool usage_error(const std::string& message) {
     std::fprintf(stderr, "kokoro: %s\nTry 'kokoro --help'.\n", message.c_str());
+    return false;
+}
+
+// Maps the --lang value; returns false for anything but "auto", "en" or "zh".
+bool parse_number_language(const std::string& value, kokoro_number_language& language) {
+    if (value == "auto") { language = KOKORO_NUMBERS_AUTO; return true; }
+    if (value == "en") { language = KOKORO_NUMBERS_ENGLISH; return true; }
+    if (value == "zh") { language = KOKORO_NUMBERS_CHINESE; return true; }
     return false;
 }
 
@@ -139,6 +150,11 @@ bool parse_args(const std::vector<std::string>& args, Options& opt) {
             case Opt::Voices: opt.voices = value; break;
             case Opt::Dict: opt.dict = value; break;
             case Opt::Voice: opt.voice = value; break;
+            case Opt::Lang:
+                if (!parse_number_language(value, opt.number_language)) {
+                    return usage_error("invalid language '" + value + "' (must be auto, en or zh)");
+                }
+                break;
             case Opt::Output: opt.output = value; break;
             case Opt::Speed:
                 if (!kokoro_cli::parse_speed(value, opt.speed)) {
@@ -231,6 +247,7 @@ int run(const Options& opt) {
         return library_error();
     }
     const std::unique_ptr<kokoro_ctx, decltype(&kokoro_destroy)> ctx(raw_ctx, &kokoro_destroy);
+    if (kokoro_set_number_language(ctx.get(), opt.number_language) != KOKORO_OK) return library_error();
     const double init_s = elapsed_s(init_start);
     std::fprintf(stderr, "Initialized engine in %.3f s\n", init_s);
 

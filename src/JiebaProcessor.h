@@ -4,7 +4,6 @@
 #include "PinyinFinder.h"
 #include "cppjieba/Jieba.hpp"
 #include "Utils.h"
-#include <regex>
 #include <fstream>
 #include <stdexcept>
 
@@ -52,6 +51,19 @@ public:
                 }
                 if (has_cn) tag = "n";
             }
+
+            // FIX: a standalone word of only ASCII letters (e.g. "I", "a") is tagged 'x' by
+            // cppjieba's special rule and would be skipped by G2P; force it to English.
+            if (tag == "x" && !word.empty()) {
+                bool all_ascii_letters = true;
+                for (const unsigned char c : word) {
+                    if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))) {
+                        all_ascii_letters = false;
+                        break;
+                    }
+                }
+                if (all_ascii_letters) tag = "eng";
+            }
             
             result.push_back({word, tag});
         }
@@ -64,40 +76,6 @@ public:
             finder->find_best_pinyin(word, pinyins);
         }
         return pinyins;
-    }
-
-    std::string convert_numbers(const std::string& text) override {
-        // Regex to find numbers: integers, floats, and IP-like strings
-        // Examples: 123, -123, 3.14, 192.168.0.1
-        // Pattern: [-+]?\d+(?:\.\d+)*
-        
-        std::regex num_regex("[-+]?\\d+(?:\\.\\d+)*");
-        std::string result;
-        
-        auto words_begin = std::sregex_iterator(text.begin(), text.end(), num_regex);
-        auto words_end = std::sregex_iterator();
-        
-        size_t last_pos = 0;
-        
-        for (std::sregex_iterator i = words_begin; i != words_end; ++i) {
-            std::smatch match = *i;
-            std::string match_str = match.str();
-            
-            // Append text before the number
-            result += text.substr(last_pos, match.position() - last_pos);
-            
-            // Convert number to Chinese
-            result += BasicStringUtil::NumberToChinese(match_str);
-            
-            last_pos = match.position() + match.length();
-        }
-        
-        // Append remaining text
-        if (last_pos < text.length()) {
-            result += text.substr(last_pos);
-        }
-        
-        return result;
     }
 
 private:
