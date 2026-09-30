@@ -11,34 +11,37 @@ A high-performance, lightweight C++ inference implementation of the [Kokoro](htt
 
 ## Requirements
 
-- **CMake** (3.14+)
+- **CMake** (3.15+)
 - **C++ compiler** (C++17 support required)
-- **Optional: Python 3** (for the data preparation scripts)
+- **Python 3** with [click](https://click.palletsprojects.com/) (`pip install click`) for `setup.py`
 
-## Data Preparation
+## Setup
 
-Before building, you need to prepare the model and voice files.
+```bash
+python setup.py configure
+```
 
-### 1. Download the voice pack
+This downloads, verifying SHA-256 checksums:
 
-This project stores voice styles in a compact binary format. You need to download the voice data.
+- the prebuilt [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
+- the model `kokoro-v1.1-zh.onnx` and the voice pack `voices-v1.1-zh.bin` from this repository's [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) into `models/`.
 
-Download `voices-v1.1-zh.bin` from [here](https://github.com/koth/kokoro.cpp/releases/download/voices_model_files/voices-v1.1-zh.bin).
-
-### 2. Download the model
-
-Download the ONNX model file.
-
-Download `kokoro-v1.1-zh.onnx` from [here](https://github.com/koth/kokoro.cpp/releases/download/voices_model_files/kokoro-v1.1-zh.onnx).
+Files that are already present and up to date are skipped; `--force` downloads them again. The ONNX Runtime version and checksums are pinned in `setup.py`. To use another ONNX Runtime installation instead, skip `configure` and pass `-DONNXRUNTIME_ROOT=/path/to/onnxruntime` to CMake.
 
 ## Building
 
 ```bash
-cmake -B build -S .
-cmake --build build --config Release
+python setup.py build
 ```
 
-This produces the shared library `kokoro` (`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`) and the `kokoro` command-line tool. On Windows the bundled static ONNX Runtime is linked into `kokoro.dll`, so the DLL has no other runtime dependencies. On Linux/macOS, `libkokoro` links against the ONNX Runtime shared library, which must be findable at runtime.
+`build` runs the CMake configure and build steps. Options: `--build-dir` (default `build`), `--config` (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`; default `Release`), `-j/--jobs`. Arguments after `--` go to the CMake configure step, e.g. `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`. It is equivalent to:
+
+```bash
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+```
+
+This produces the shared library `kokoro` (`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`) and the `kokoro` command-line tool. `libkokoro` links against the ONNX Runtime shared library. On Linux/macOS the build tree finds it through the rpath; installed copies need it findable at runtime. On Windows `onnxruntime.dll` is copied next to `kokoro.dll` (and installed with it).
 
 ### Tests
 
@@ -140,6 +143,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/ZHFrontend.cpp/h`: Chinese frontend (G2P, tone sandhi).
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
 - `tests/`: library tests (run with `ctest`).
+- `setup.py`: downloads dependencies (`configure`) and runs CMake (`build`).
 - `scripts/`: helper scripts for data processing.
 - `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
 
@@ -162,34 +166,37 @@ MIT
 
 ## 依赖环境
 
-- **CMake** (3.14+)
+- **CMake** (3.15+)
 - **C++ 编译器** (需要支持 C++17)
-- **可选： Python 3** (用于数据准备脚本)
+- **Python 3** 及 [click](https://click.palletsprojects.com/)（`pip install click`），用于 `setup.py`
 
-## 数据准备
+## 准备
 
-在编译之前，你需要准备模型和语音文件。
+```bash
+python setup.py configure
+```
 
-### 1. 下载语音包
+该命令会下载以下文件并校验 SHA-256：
 
-本项目使用紧凑的二进制格式存储语音风格。你需要下载语音数据。
+- 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2（CPU 版），放入 `third_party/onnxruntime/`；
+- 模型 `kokoro-v1.1-zh.onnx` 和语音包 `voices-v1.1-zh.bin`，来自本仓库的 [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files)，放入 `models/`。
 
-请从[这里](https://github.com/koth/kokoro.cpp/releases/download/voices_model_files/voices-v1.1-zh.bin)下载 `voices-v1.1-zh.bin`。
-
-### 2. 下载模型
-
-下载 ONNX 模型文件。
-
-请从[这里](https://github.com/koth/kokoro.cpp/releases/download/voices_model_files/kokoro-v1.1-zh.onnx)下载 `kokoro-v1.1-zh.onnx`。
+已存在且校验一致的文件会被跳过；`--force` 强制重新下载。ONNX Runtime 版本和校验值固定在 `setup.py` 中。如需使用其他 ONNX Runtime，可跳过 `configure`，并向 CMake 传入 `-DONNXRUNTIME_ROOT=/path/to/onnxruntime`。
 
 ## 编译
 
 ```bash
-cmake -B build -S .
-cmake --build build --config Release
+python setup.py build
 ```
 
-编译产物为共享库 `kokoro`（`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`）以及 `kokoro` 命令行工具。Windows 下内置的静态 ONNX Runtime 会被链接进 `kokoro.dll`，DLL 不依赖其他运行库；Linux/macOS 下 `libkokoro` 链接 ONNX Runtime 共享库，运行时需能找到它。
+`build` 执行 CMake 的配置和编译。选项：`--build-dir`（默认 `build`）、`--config`（`Debug`、`Release`、`RelWithDebInfo`、`MinSizeRel`，默认 `Release`）、`-j/--jobs`。`--` 之后的参数会传给 CMake 配置步骤，例如 `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`。等价于：
+
+```bash
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+```
+
+编译产物为共享库 `kokoro`（`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`）以及 `kokoro` 命令行工具。`libkokoro` 链接 ONNX Runtime 共享库：Linux/macOS 下构建目录中通过 rpath 找到它，安装后运行时需能找到它；Windows 下 `onnxruntime.dll` 会被复制到 `kokoro.dll` 旁边（并随之安装）。
 
 ### 测试
 
@@ -291,6 +298,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
 - `tests/`: 库测试（使用 `ctest` 运行）。
+- `setup.py`: 下载依赖（`configure`）并运行 CMake（`build`）。
 - `scripts/`: 数据处理辅助脚本。
 - `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
 

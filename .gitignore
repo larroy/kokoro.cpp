@@ -3,6 +3,8 @@ build/
 bin/
 out/
 models/
+# Downloaded by `python setup.py configure`
+third_party/onnxruntime/
 # C++ compiled files
 *.o
 *.obj

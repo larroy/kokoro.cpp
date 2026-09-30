@@ -11,11 +11,6 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
 if (MSVC)
     add_compile_options("/utf-8" "/EHsc" "/Zc:inline" "/permissive-" "/Ob2")
-
-    # The bundled static onnxruntime.lib is built with /MT and _ITERATOR_DEBUG_LEVEL=0,
-    # so every configuration must use the static release CRT.
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
-
     add_compile_definitions(_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
@@ -23,7 +18,7 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 # ONNX Runtime Configuration
-# Priority 1: Check third_party/onnxruntime
+# Priority 1: third_party/onnxruntime, downloaded by `python setup.py configure`
 set(LOCAL_ONNX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime")
 if(EXISTS "${LOCAL_ONNX_PATH}")
     message(STATUS "Using local ONNX Runtime from: ${LOCAL_ONNX_PATH}")
@@ -40,90 +35,38 @@ endif()
 
 message(STATUS "Looking for ONNX Runtime in: ${ONNXRUNTIME_ROOT}")
 
+# Forget cached results that no longer exist (e.g. after the bundled runtime was replaced).
+foreach(var ONNXRUNTIME_INCLUDE_DIR ONNXRUNTIME_LIB ONNXRUNTIME_DLL)
+    if (${var} AND NOT EXISTS "${${var}}")
+        unset(${var} CACHE)
+    endif()
+endforeach()
+
 find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h
     HINTS ${ONNXRUNTIME_ROOT}/include
     PATH_SUFFIXES onnxruntime core/session
 )
 
-# 查找静态链接库
-# 首先尝试查找静态库
 find_library(ONNXRUNTIME_LIB onnxruntime
     HINTS ${ONNXRUNTIME_ROOT}/lib
-    PATH_SUFFIXES 
-        mac_arm64 
-        linux_x64 
-        windows_x64
-        mac_x64
-        linux_aarch64
 )
 
-# 如果没有找到静态库，尝试查找并解压zip文件
-if(NOT ONNXRUNTIME_LIB)
-    message(STATUS "onnxruntime.lib not found, looking for onnxruntime.zip...")
-    
-    # 定义可能的zip文件路径
-    set(ZIP_PATHS
-        "${ONNXRUNTIME_ROOT}/lib/onnxruntime.zip"
-        "${ONNXRUNTIME_ROOT}/lib/mac_arm64/onnxruntime.zip"
-        "${ONNXRUNTIME_ROOT}/lib/linux_x64/onnxruntime.zip"
-        "${ONNXRUNTIME_ROOT}/lib/windows_x64/onnxruntime.zip"
-        "${ONNXRUNTIME_ROOT}/lib/mac_x64/onnxruntime.zip"
-        "${ONNXRUNTIME_ROOT}/lib/linux_aarch64/onnxruntime.zip"
-    )
-    
-    # 检查每个可能的zip路径
-    foreach(ZIP_PATH ${ZIP_PATHS})
-        if(EXISTS "${ZIP_PATH}")
-            message(STATUS "Found onnxruntime.zip at: ${ZIP_PATH}")
-            
-            # 创建解压目录
-            set(EXTRACT_DIR "${CMAKE_BINARY_DIR}/onnxruntime_extracted")
-            file(MAKE_DIRECTORY ${EXTRACT_DIR})
-            
-            # 解压zip文件
-            execute_process(
-                COMMAND ${CMAKE_COMMAND} -E tar xzf "${ZIP_PATH}"
-                WORKING_DIRECTORY ${EXTRACT_DIR}
-                RESULT_VARIABLE UNZIP_RESULT
-            )
-            
-            if(UNZIP_RESULT EQUAL 0)
-                message(STATUS "Successfully extracted onnxruntime.zip to ${EXTRACT_DIR}")
-                
-                # 重新查找解压后的库文件
-                find_library(ONNXRUNTIME_LIB onnxruntime
-                    HINTS ${EXTRACT_DIR}
-                    NO_DEFAULT_PATH
-                )
-                
-                if(ONNXRUNTIME_LIB)
-                    message(STATUS "Using extracted onnxruntime library: ${ONNXRUNTIME_LIB}")
-                    break()
-                else()
-                    message(WARNING "Could not find onnxruntime library in extracted directory")
-                    
-                    # 尝试查找其他可能的名称
-                    find_library(ONNXRUNTIME_LIB libonnxruntime
-                        HINTS ${EXTRACT_DIR}
-                        NO_DEFAULT_PATH
-                    )
-                    
-                    if(ONNXRUNTIME_LIB)
-                        message(STATUS "Using extracted libonnxruntime library: ${ONNXRUNTIME_LIB}")
-                        break()
-                    endif()
-                endif()
-            else()
-                message(WARNING "Failed to extract onnxruntime.zip, error code: ${UNZIP_RESULT}")
-            endif()
-        endif()
-    endforeach()
-endif()
-
 if (NOT (ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIB))
-    message(FATAL_ERROR "ONNX Runtime not found. Set ONNXRUNTIME_ROOT, e.g. cmake -DONNXRUNTIME_ROOT=/path/to/onnxruntime ..")
+    message(FATAL_ERROR "ONNX Runtime not found. Run `python setup.py configure`, or set ONNXRUNTIME_ROOT, e.g. cmake -DONNXRUNTIME_ROOT=/path/to/onnxruntime ..")
 endif()
 message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
+
+# Windows has no rpath: onnxruntime.dll has to sit next to every executable that loads kokoro.dll.
+if (WIN32)
+    get_filename_component(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_LIB}" DIRECTORY)
+    find_file(ONNXRUNTIME_DLL onnxruntime.dll
+        HINTS ${ONNXRUNTIME_LIB_DIR} ${ONNXRUNTIME_ROOT}/bin
+        NO_DEFAULT_PATH
+    )
+    if (NOT ONNXRUNTIME_DLL)
+        message(FATAL_ERROR "onnxruntime.dll not found next to ${ONNXRUNTIME_LIB}")
+    endif()
+endif()
 
 # Internal implementation, linked into libkokoro and test_g2p.
 add_library(kokoro_core STATIC
@@ -156,10 +99,10 @@ set_target_properties(kokoro PROPERTIES
     SOVERSION ${PROJECT_VERSION_MAJOR}
 )
 
-if (MSVC)
-    # Static onnxruntime.lib ships without PDBs (LNK4099) and needs these system libraries.
-    target_link_options(kokoro PRIVATE "/IGNORE:4099")
-    target_link_libraries(kokoro PRIVATE Advapi32 Ws2_32 Shlwapi userenv Synchronization bufferoverflowu)
+if (WIN32)
+    add_custom_command(TARGET kokoro POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ONNXRUNTIME_DLL}" $<TARGET_FILE_DIR:kokoro>)
+    install(FILES "${ONNXRUNTIME_DLL}" DESTINATION ${CMAKE_INSTALL_BINDIR})
 elseif (APPLE)
     target_link_libraries(kokoro PRIVATE "-framework Foundation" "-framework CoreFoundation")
     set_target_properties(kokoro PROPERTIES INSTALL_RPATH "@loader_path")
