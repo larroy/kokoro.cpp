@@ -26,7 +26,6 @@ Kokoro::Kokoro(const std::string& model_path, const std::string& voices_path, co
 {
     // Initialize session options
     Ort::SessionOptions session_options;
-    session_options.SetIntraOpNumThreads(1);
     session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
     // Load model
