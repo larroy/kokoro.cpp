@@ -21,17 +21,58 @@ const int STYLE_DIM = 256;          // floats per style row; a voice is a table 
 
 class Kokoro {
 public:
-    // Throws std::runtime_error when the model, voices, vocab or G2P dictionaries cannot be loaded.
-    // dict_dir holds vocab.txt and the G2P dictionaries. Paths are UTF-8.
+    /** \brief Constructs a Kokoro instance.
+     *
+     *  Loads the ONNX model, voice embeddings, vocabulary, and G2P dictionaries.
+     *
+     *  \param model_path Path to the ONNX model file (UTF-8).
+     *  \param voices_path Path to the voices embeddings file (UTF-8).
+     *  \param dict_dir Path to directory containing vocab.txt and G2P dictionaries (UTF-8).
+     *
+     *  \throws std::runtime_error if any required resource fails to load.
+     */
     Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& dict_dir);
+    
+    /** \brief Destroys the Kokoro instance and releases resources. */
     ~Kokoro();
 
-    // Throws std::out_of_range when the voice does not exist.
+    /** \brief Retrieves a voice embedding by name.
+     *
+     *  \param name Voice identifier (e.g., "af_bella", "af_sarah").
+     *
+     *  \return const reference to the voice embedding vector (256 floats).
+     *  \throws std::out_of_range if the voice name is not found.
+     */
     const std::vector<float>& get_voice_style(const std::string& name) const;
+    
+    /** \brief Returns the list of available voice identifiers.
+     *
+     *  \return Vector of voice names loaded from the voices file.
+     */
     std::vector<std::string> voice_names() const;
-    // Text -> phoneme string as consumed by create(..., is_phonemes = true).
+    
+    /** \brief Converts plain text to a phoneme string.
+     *
+     *  Uses the loaded G2P dictionaries and tokenizer to transform text
+     *  into the phoneme representation used by the synthesis engine.
+     *
+     *  \param text Input text to phonemize (UTF-8).
+     *  \return Phoneme string suitable for create(..., is_phonemes=true).
+     */
     std::string phonemize(const std::string& text);
 
+    /** \brief Synthesizes audio from text using a named voice.
+     *
+     *  Text is automatically converted to phonemes internally.
+     *
+     *  \param text Input text to synthesize (UTF-8).
+     *  \param voice_name Voice identifier from voice_names().
+     *  \param speed Playback speed multiplier (default 1.0).
+     *  \param is_phonemes Set true if text is already a phoneme string (default false).
+     *  \param trim Set true to remove silence at start/end (default true).
+     *
+     *  \return Pair of (audio_samples, sample_rate). Audio is 32-bit float PCM.
+     */
     std::pair<std::vector<float>, int> create(
         const std::string& text,
         const std::string& voice_name,
@@ -40,7 +81,18 @@ public:
         bool trim = true
     );
 
-    // Overload for passing voice style directly
+    /** \brief Synthesizes audio from text using a raw voice embedding.
+     *
+     *  Useful when voice embeddings are stored externally or computed.
+     *
+     *  \param text Input text to synthesize (UTF-8).
+     *  \param voice_style Reference to a 256-element float vector.
+     *  \param speed Playback speed multiplier (default 1.0).
+     *  \param is_phonemes Set true if text is already a phoneme string (default false).
+     *  \param trim Set true to remove silence at start/end (default true).
+     *
+     *  \return Pair of (audio_samples, sample_rate). Audio is 32-bit float PCM.
+     */
     std::pair<std::vector<float>, int> create(
         const std::string& text,
         const std::vector<float>& voice_style,
