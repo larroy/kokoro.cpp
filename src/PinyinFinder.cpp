@@ -5,6 +5,7 @@
 #include <locale>
 #include <limits>
 #include <cstring>
+#include <cstdint>
 #include <cstdio>
 
 PinyinFinder::PinyinFinder() {}
