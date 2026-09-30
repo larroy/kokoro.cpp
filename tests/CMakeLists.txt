@@ -1,4 +1,3 @@
-enable_language(C)
 find_package(Threads REQUIRED)
 
 add_library(kokoro_doctest INTERFACE)

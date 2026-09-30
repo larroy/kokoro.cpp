@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(KokoroCPP VERSION 0.1.0 LANGUAGES CXX)
+project(KokoroCPP VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,6 +16,8 @@ endif()
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+
+find_package(Threads REQUIRED)
 
 # ONNX Runtime Configuration
 # Priority 1: third_party/onnxruntime, downloaded by `uv run bootstrap.py configure`
@@ -111,8 +113,21 @@ elseif (UNIX)
 endif()
 
 # Command-line tool. Target name differs from the library; the executable is still named `kokoro`.
-add_executable(kokoro_cli src/cli/main.cpp)
-target_link_libraries(kokoro_cli PRIVATE kokoro)
+add_executable(kokoro_cli
+    src/cli/main.cpp
+    src/cli/console.cpp
+    src/cli/interactive.cpp
+    src/cli/audio_player.cpp
+    third_party/miniaudio/miniaudio.c
+)
+target_include_directories(kokoro_cli SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/miniaudio")
+# Playback only: drop miniaudio's decoders, encoders, generators and high-level engine.
+target_compile_definitions(kokoro_cli PRIVATE
+    MA_NO_DECODING MA_NO_ENCODING MA_NO_GENERATION MA_NO_RESOURCE_MANAGER MA_NO_NODE_GRAPH MA_NO_ENGINE)
+target_link_libraries(kokoro_cli PRIVATE kokoro Threads::Threads ${CMAKE_DL_LIBS})
+if (UNIX AND NOT APPLE)
+    target_link_libraries(kokoro_cli PRIVATE m)
+endif()
 set_target_properties(kokoro_cli PROPERTIES OUTPUT_NAME kokoro)
 if (WIN32)
     target_link_libraries(kokoro_cli PRIVATE Shell32)   # CommandLineToArgvW

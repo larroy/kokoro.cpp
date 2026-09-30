@@ -1,6 +1,10 @@
 // kokoro: command-line front end for libkokoro (public C API only).
 #include <kokoro/kokoro.h>
 
+#include "console.h"
+#include "interactive.h"
+#include "speed.h"
+
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -10,11 +14,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <shellapi.h>
-#endif
 
 namespace {
 
@@ -28,13 +27,14 @@ struct Options {
     bool input_phonemes = false;  // -p/--phonemes
     bool phonemize = false;       // --phonemize
     bool list_voices = false;     // --list-voices
+    bool interactive = false;     // -i/--interactive
     bool help = false;
     bool version = false;
     bool has_text = false;
     std::string text;
 };
 
-enum class Opt { Model, Voices, Dict, Voice, Speed, Output, Phonemes, Phonemize, ListVoices, Help, Version };
+enum class Opt { Model, Voices, Dict, Voice, Speed, Output, Phonemes, Phonemize, ListVoices, Interactive, Help, Version };
 
 struct OptionSpec {
     const char* short_name;  // nullptr if the option has no short form
@@ -53,6 +53,7 @@ constexpr OptionSpec kOptions[] = {
     {"-p", "--phonemes", Opt::Phonemes, false},
     {nullptr, "--phonemize", Opt::Phonemize, false},
     {nullptr, "--list-voices", Opt::ListVoices, false},
+    {"-i", "--interactive", Opt::Interactive, false},
     {"-h", "--help", Opt::Help, false},
     {nullptr, "--version", Opt::Version, false},
 };
@@ -68,6 +69,7 @@ void print_usage(std::FILE* out) {
     std::fputs(
         "Usage: kokoro [options] <text>\n"
         "       kokoro --list-voices [options]\n"
+        "       kokoro --interactive [options]\n"
         "\n"
         "Synthesize UTF-8 <text> to a WAV file with the Kokoro TTS model.\n"
         "\n"
@@ -77,10 +79,11 @@ void print_usage(std::FILE* out) {
         "  -d, --dict <dir>      dictionary directory (default: dict)\n"
         "  -v, --voice <name>    voice to use (default: af_maple)\n"
         "  -s, --speed <rate>    speaking rate, > 0 (default: 1.0)\n"
-        "  -o, --output <path>   output WAV file (default: output.wav)\n"
+        "  -o, --output <path>   output WAV file (default: output.wav; unused with -i)\n"
         "  -p, --phonemes        <text> is a phoneme string; skip G2P\n"
         "      --phonemize       print the phonemes for <text> instead of synthesizing\n"
         "      --list-voices     print the available voices and exit\n"
+        "  -i, --interactive     read phrases from stdin and play them as they are synthesized\n"
         "  -h, --help            print this help and exit\n"
         "      --version         print the library version and exit\n",
         out);
@@ -89,42 +92,6 @@ void print_usage(std::FILE* out) {
 bool usage_error(const std::string& message) {
     std::fprintf(stderr, "kokoro: %s\nTry 'kokoro --help'.\n", message.c_str());
     return false;
-}
-
-#ifdef _WIN32
-std::string wide_to_utf8(const wchar_t* wide) {
-    const int len = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
-    if (len <= 1) return {};
-    std::string utf8(static_cast<size_t>(len), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, wide, -1, &utf8[0], len, nullptr, nullptr);
-    utf8.resize(static_cast<size_t>(len) - 1);  // drop the terminator WideCharToMultiByte wrote
-    return utf8;
-}
-#endif
-
-// The library takes UTF-8. On Windows, argv is in the ANSI code page and loses characters outside it,
-// so re-read the command line as UTF-16.
-std::vector<std::string> utf8_args(int argc, char** argv) {
-#ifdef _WIN32
-    int count = 0;
-    if (LPWSTR* wide = CommandLineToArgvW(GetCommandLineW(), &count)) {
-        std::vector<std::string> args;
-        args.reserve(static_cast<size_t>(count));
-        for (int i = 0; i < count; ++i) args.push_back(wide_to_utf8(wide[i]));
-        LocalFree(wide);
-        return args;
-    }
-#endif
-    return std::vector<std::string>(argv, argv + argc);
-}
-
-bool parse_speed(const std::string& value, float& speed) {
-    if (value.empty()) return false;
-    char* end = nullptr;
-    const float parsed = std::strtof(value.c_str(), &end);
-    if (end != value.c_str() + value.size() || !std::isfinite(parsed) || !(parsed > 0.0f)) return false;
-    speed = parsed;
-    return true;
 }
 
 // Returns false after printing a usage error.
@@ -174,13 +141,14 @@ bool parse_args(const std::vector<std::string>& args, Options& opt) {
             case Opt::Voice: opt.voice = value; break;
             case Opt::Output: opt.output = value; break;
             case Opt::Speed:
-                if (!parse_speed(value, opt.speed)) {
+                if (!kokoro_cli::parse_speed(value, opt.speed)) {
                     return usage_error("invalid speed '" + value + "' (must be a number > 0)");
                 }
                 break;
             case Opt::Phonemes: opt.input_phonemes = true; break;
             case Opt::Phonemize: opt.phonemize = true; break;
             case Opt::ListVoices: opt.list_voices = true; break;
+            case Opt::Interactive: opt.interactive = true; break;
             case Opt::Help: opt.help = true; return true;
             case Opt::Version: opt.version = true; return true;
         }
@@ -189,7 +157,10 @@ bool parse_args(const std::vector<std::string>& args, Options& opt) {
     if (opt.list_voices && opt.phonemize) return usage_error("--list-voices cannot be combined with --phonemize");
     if (opt.phonemize && opt.input_phonemes) return usage_error("--phonemize cannot be combined with --phonemes");
     if (opt.list_voices && opt.has_text) return usage_error("--list-voices does not take <text>");
-    if (!opt.list_voices && !opt.has_text) return usage_error("missing <text>");
+    if (opt.interactive && opt.list_voices) return usage_error("--interactive cannot be combined with --list-voices");
+    if (opt.interactive && opt.phonemize) return usage_error("--interactive cannot be combined with --phonemize");
+    if (opt.interactive && opt.has_text) return usage_error("--interactive does not take <text>");
+    if (!opt.list_voices && !opt.interactive && !opt.has_text) return usage_error("missing <text>");
     return true;
 }
 
@@ -277,8 +248,10 @@ int run(const Options& opt) {
         return 0;
     }
 
-    kokoro_audio audio{};
     const unsigned flags = opt.input_phonemes ? KOKORO_INPUT_PHONEMES : 0u;
+    if (opt.interactive) return kokoro_cli::run_interactive(ctx.get(), {opt.voice, opt.speed, flags});
+
+    kokoro_audio audio{};
     const auto synth_start = Clock::now();
     if (kokoro_synthesize(ctx.get(), opt.text.c_str(), opt.voice.c_str(), opt.speed, flags, &audio) != KOKORO_OK) {
         return library_error();
@@ -301,11 +274,9 @@ int run(const Options& opt) {
 }  // namespace
 
 int main(int argc, char** argv) {
-#ifdef _WIN32
-    SetConsoleOutputCP(CP_UTF8);
-#endif
+    kokoro_cli::init_console();
     Options opt;
-    if (!parse_args(utf8_args(argc, argv), opt)) return 2;
+    if (!parse_args(kokoro_cli::utf8_args(argc, argv), opt)) return 2;
     if (opt.help) {
         print_usage(stdout);
         return 0;
