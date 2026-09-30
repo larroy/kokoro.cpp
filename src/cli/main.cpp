@@ -1,7 +1,7 @@
 // kokoro: command-line front end for libkokoro (public C API only).
 #include <kokoro/kokoro.h>
 
-#include <cmath>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -247,12 +247,21 @@ int library_error() {
     return 1;
 }
 
+using Clock = std::chrono::steady_clock;
+
+double elapsed_s(Clock::time_point start) {
+    return std::chrono::duration<double>(Clock::now() - start).count();
+}
+
 int run(const Options& opt) {
+    const auto init_start = Clock::now();
     kokoro_ctx* raw_ctx = nullptr;
     if (kokoro_create(opt.model.c_str(), opt.voices.c_str(), opt.dict.c_str(), &raw_ctx) != KOKORO_OK) {
         return library_error();
     }
     const std::unique_ptr<kokoro_ctx, decltype(&kokoro_destroy)> ctx(raw_ctx, &kokoro_destroy);
+    const double init_s = elapsed_s(init_start);
+    std::fprintf(stderr, "Initialized engine in %.3f s\n", init_s);
 
     if (opt.list_voices) {
         const size_t count = kokoro_voice_count(ctx.get());
@@ -270,9 +279,11 @@ int run(const Options& opt) {
 
     kokoro_audio audio{};
     const unsigned flags = opt.input_phonemes ? KOKORO_INPUT_PHONEMES : 0u;
+    const auto synth_start = Clock::now();
     if (kokoro_synthesize(ctx.get(), opt.text.c_str(), opt.voice.c_str(), opt.speed, flags, &audio) != KOKORO_OK) {
         return library_error();
     }
+    const double synth_s = elapsed_s(synth_start);
     std::string error;
     const bool written = write_wav(opt.output, audio, error);
     const double seconds = audio.sample_rate > 0 ? static_cast<double>(audio.num_samples) / audio.sample_rate : 0.0;
@@ -282,7 +293,8 @@ int run(const Options& opt) {
         std::fprintf(stderr, "kokoro: %s\n", error.c_str());
         return 1;
     }
-    std::fprintf(stderr, "Wrote %s (%.2f s, %d Hz)\n", opt.output.c_str(), seconds, sample_rate);
+    std::fprintf(stderr, "Wrote %s (%.2f s audio, %d Hz, synthesis %.3f s)\n", opt.output.c_str(), seconds, sample_rate,
+                 synth_s);
     return 0;
 }
 
