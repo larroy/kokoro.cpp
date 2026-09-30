@@ -17,6 +17,7 @@ struct KoKoroConfig;
 // Constants from config
 const int MAX_PHONEME_LENGTH = 510; // Example value
 const int SAMPLE_RATE = 24000;      // Example value
+const int STYLE_DIM = 256;          // floats per style row; a voice is a table of these rows
 
 class Kokoro {
 public:

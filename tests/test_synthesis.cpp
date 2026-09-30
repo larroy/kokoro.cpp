@@ -6,26 +6,85 @@
 
 #include <kokoro/kokoro.h>
 
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace {
 
 kokoro_ctx* g_ctx = nullptr;
+const char* g_model_path = nullptr;
+const char* g_voices_path = nullptr;
+const char* g_dict_dir = nullptr;
 
 const char* const kText = "你好，世界。";
 const char* const kVoice = "zf_002";
 
-std::vector<float> synth(const char* text, const char* voice, float speed, unsigned flags, kokoro_status* status) {
+std::vector<float> synth(kokoro_ctx* ctx, const char* text, const char* voice, float speed, unsigned flags,
+                         kokoro_status* status) {
     kokoro_audio audio{};
-    *status = kokoro_synthesize(g_ctx, text, voice, speed, flags, &audio);
+    *status = kokoro_synthesize(ctx, text, voice, speed, flags, &audio);
     std::vector<float> samples(audio.samples, audio.samples + audio.num_samples);
     kokoro_audio_free(&audio);
     return samples;
+}
+
+std::vector<float> synth(const char* text, const char* voice, float speed, unsigned flags, kokoro_status* status) {
+    return synth(g_ctx, text, voice, speed, flags, status);
+}
+
+// Minimal reader/writer for the voices file format (docs/adding-voices.md).
+using VoiceTable = std::map<std::string, std::vector<float>>;
+constexpr size_t kStyleDim = 256;
+constexpr size_t kStyleRows = 510;
+
+uint32_t read_u32(std::ifstream& in) {
+    uint32_t v = 0;
+    in.read(reinterpret_cast<char*>(&v), sizeof v);
+    return v;
+}
+
+void write_u32(std::ofstream& out, uint32_t v) {
+    out.write(reinterpret_cast<const char*>(&v), sizeof v);
+}
+
+VoiceTable read_voices(const char* path) {
+    std::ifstream in(std::filesystem::u8path(path), std::ios::binary);
+    char magic[4] = {};
+    in.read(magic, 4);
+    if (!in || std::memcmp(magic, "VOIC", 4) != 0 || read_u32(in) != 1) throw std::runtime_error("bad voices file");
+    VoiceTable voices;
+    for (uint32_t count = read_u32(in); in && count > 0; --count) {
+        std::string name(read_u32(in), '\0');
+        in.read(&name[0], static_cast<std::streamsize>(name.size()));
+        std::vector<float> style(read_u32(in));
+        in.read(reinterpret_cast<char*>(style.data()), static_cast<std::streamsize>(style.size() * sizeof(float)));
+        voices[name] = std::move(style);
+    }
+    if (!in) throw std::runtime_error("truncated voices file");
+    return voices;
+}
+
+void write_voices(const std::filesystem::path& path, const VoiceTable& voices) {
+    std::ofstream out(path, std::ios::binary);
+    out.write("VOIC", 4);
+    write_u32(out, 1);
+    write_u32(out, static_cast<uint32_t>(voices.size()));
+    for (const auto& [name, style] : voices) {
+        write_u32(out, static_cast<uint32_t>(name.size()));
+        out.write(name.data(), static_cast<std::streamsize>(name.size()));
+        write_u32(out, static_cast<uint32_t>(style.size()));
+        out.write(reinterpret_cast<const char*>(style.data()), static_cast<std::streamsize>(style.size() * sizeof(float)));
+    }
+    if (!out) throw std::runtime_error("cannot write " + path.string());
 }
 
 }  // namespace
@@ -123,6 +182,44 @@ TEST_CASE("invalid_speed_and_flags_rejected") {
     CHECK(kokoro_synthesize(g_ctx, kText, kVoice, 1.0f, 0x2u, &audio) == KOKORO_ERROR_INVALID_ARGUMENT);
 }
 
+// A chunk of n phoneme tokens must use style row n - 1, as upstream Kokoro does (`pack[len(ps)-1]`).
+// Each probe voice is zf_002 with row 4 taken from af_maple, so on a 5-token input it matches
+// af_maple's deterministic duration only if row 4 is the row read. probe_short ends at row 4,
+// which covers the last row of a table (row 509 of a full one).
+TEST_CASE("style_row_follows_token_count") {
+    const char* const input = "nixau";  // 5 phonemes, all in the vocabulary: one token each
+    const size_t row = 4;
+
+    VoiceTable voices = read_voices(g_voices_path);
+    const std::vector<float>& donor = voices.at("af_maple");
+    std::vector<float> probe = voices.at("zf_002");
+    REQUIRE(probe.size() == kStyleRows * kStyleDim);
+    std::copy_n(donor.begin() + row * kStyleDim, kStyleDim, probe.begin() + row * kStyleDim);
+    voices["probe_short"].assign(probe.begin(), probe.begin() + (row + 1) * kStyleDim);
+    voices["probe"] = std::move(probe);
+    const auto probe_path = std::filesystem::temp_directory_path() / "kokoro_test_probe_voices.bin";
+    write_voices(probe_path, voices);
+
+    kokoro_ctx* ctx = nullptr;
+    const kokoro_status created = kokoro_create(g_model_path, probe_path.u8string().c_str(), g_dict_dir, &ctx);
+    std::filesystem::remove(probe_path);
+    REQUIRE_MESSAGE(created == KOKORO_OK, kokoro_last_error());
+
+    auto length = [&](const char* voice) {
+        kokoro_status status = KOKORO_ERROR_UNKNOWN;
+        const size_t n = synth(ctx, input, voice, 1.0f, KOKORO_INPUT_PHONEMES, &status).size();
+        CAPTURE(voice);
+        CHECK(status == KOKORO_OK);
+        return n;
+    };
+    const size_t with_donor = length("af_maple");
+    // Otherwise a wrong row could not be told apart from the right one.
+    REQUIRE(with_donor != length("zf_002"));
+    CHECK(length("probe") == with_donor);
+    CHECK(length("probe_short") == with_donor);
+    kokoro_destroy(ctx);
+}
+
 int main(int argc, char** argv) {
     if (argc < 4) {
         std::fprintf(stderr, "usage: test_synthesis <model.onnx> <voices.bin> <dict_dir> [doctest options]\n");
@@ -133,7 +230,10 @@ int main(int argc, char** argv) {
         std::printf("SKIP: model or voices file not found (%s, %s)\n", argv[1], argv[2]);
         return 77;
     }
-    if (kokoro_create(argv[1], argv[2], argv[3], &g_ctx) != KOKORO_OK) {
+    g_model_path = argv[1];
+    g_voices_path = argv[2];
+    g_dict_dir = argv[3];
+    if (kokoro_create(g_model_path, g_voices_path, g_dict_dir, &g_ctx) != KOKORO_OK) {
         std::fprintf(stderr, "kokoro_create failed: %s\n", kokoro_last_error());
         return 1;
     }

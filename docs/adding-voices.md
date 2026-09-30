@@ -12,7 +12,7 @@ There are three ways to get a new voice:
 
 A voice is a table of **510 rows × 256 float32 values** (130,560 floats).
 
-- Each row is a style vector for one input length. kokoro.cpp picks row *N* for a chunk of *N* phoneme tokens (`Kokoro::_create_audio` in `src/Kokoro.cpp`), and long text is split into chunks of at most 510 tokens.
+- Each row is a style vector for one input length. kokoro.cpp picks row *N* − 1 for a chunk of *N* phoneme tokens (`Kokoro::_create_audio` in `src/Kokoro.cpp`), as upstream Kokoro does, and long text is split into chunks of at most 510 tokens.
 - Within a row, the first 128 values feed the decoder (timbre) and the last 128 feed the prosody predictor (duration, pitch, energy).
 - A voice only works well with the model it was made for. The bundled voices were made for [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh), the model in `models/kokoro-v1.1-zh.onnx`.
 
@@ -39,7 +39,8 @@ How the loader (`Kokoro::load_voices`) treats the file:
 - Names are case-sensitive.
 - If a name appears twice, the later entry wins.
 - `--list-voices` and `kokoro_voice_name()` return the names sorted.
-- Always write full 510 × 256 tables. A table with fewer rows makes long chunks fall back to row 0 and print `Warning: Style index out of bounds`.
+- Voices must be a whole number of 256-float rows, or loading fails.
+- Always write full 510 × 256 tables. With fewer rows, longer chunks all reuse the last row, which was made for a different length.
 
 ## Helper: `voicebin.py`
 

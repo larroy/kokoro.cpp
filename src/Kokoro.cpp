@@ -104,6 +104,11 @@ void Kokoro::load_voices(const std::string& voices_path) {
         std::string name(name_len, '\0');
         uint32_t dim = 0;
         if (!in.read(&name[0], name_len) || !in.read(reinterpret_cast<char*>(&dim), 4)) break;
+        if (dim == 0 || dim % STYLE_DIM != 0) {
+            throw std::runtime_error("Invalid voice '" + name + "' in " + voices_path + ": " + std::to_string(dim) +
+                                     " floats is not a whole number of " + std::to_string(STYLE_DIM) +
+                                     "-float style rows");
+        }
 
         std::vector<float> style(dim);
         if (!in.read(reinterpret_cast<char*>(style.data()), dim * sizeof(float))) break;
@@ -191,23 +196,13 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
     // Prepare inputs
     std::vector<int64_t> input_shape = {1, (int64_t)tokens.size()};
     
-    // Prepare voice style
-    // Voice loaded from npy is a stack of styles indexed by token length (MAX_PHONEME_LENGTH x STYLE_DIM)    
-    const int STYLE_DIM = 256;
-    std::vector<float> selected_style;
-    if (voice.size() > STYLE_DIM) {
-         size_t index = tokens_raw.size();
-         if (index * STYLE_DIM + STYLE_DIM <= voice.size()) {
-             auto start = voice.begin() + index * STYLE_DIM;
-             selected_style.assign(start, start + STYLE_DIM);
-         } else {
-             // Fallback or error
-             std::cerr << "Warning: Style index out of bounds. Using first style." << std::endl;
-             selected_style.assign(voice.begin(), voice.begin() + STYLE_DIM);
-         }
-    } else {
-        selected_style = voice;
-    }
+    // A voice holds one style row per chunk length: n tokens use row n - 1, as upstream Kokoro
+    // (`pack[len(ps)-1]`) and kokoro-onnx do. Lengths past the table use its last row; a chunk with
+    // no in-vocabulary tokens uses row 0.
+    const size_t rows = voice.size() / STYLE_DIM;
+    const size_t row = std::min(std::max<size_t>(tokens_raw.size(), 1), rows) - 1;
+    const auto style_begin = voice.begin() + row * STYLE_DIM;
+    std::vector<float> selected_style(style_begin, style_begin + STYLE_DIM);
 
     std::vector<int64_t> style_shape = {1, (int64_t)selected_style.size()};
     std::vector<int64_t> speed_shape = {1};
