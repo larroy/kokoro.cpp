@@ -38,11 +38,15 @@ endif()
 message(STATUS "Looking for ONNX Runtime in: ${ONNXRUNTIME_ROOT}")
 
 # Forget cached results that no longer exist (e.g. after the bundled runtime was replaced).
-foreach(var ONNXRUNTIME_INCLUDE_DIR ONNXRUNTIME_LIB ONNXRUNTIME_DLL)
+foreach(var ONNXRUNTIME_LIB ONNXRUNTIME_DLL)
     if (${var} AND NOT EXISTS "${${var}}")
         unset(${var} CACHE)
     endif()
 endforeach()
+# A source-built ORT puts its headers in include/onnxruntime/; the stale include/ dir still exists after the switch.
+if (ONNXRUNTIME_INCLUDE_DIR AND NOT EXISTS "${ONNXRUNTIME_INCLUDE_DIR}/onnxruntime_cxx_api.h")
+    unset(ONNXRUNTIME_INCLUDE_DIR CACHE)
+endif()
 
 find_path(ONNXRUNTIME_INCLUDE_DIR onnxruntime_cxx_api.h
     HINTS ${ONNXRUNTIME_ROOT}/include
@@ -58,6 +62,15 @@ if (NOT (ONNXRUNTIME_INCLUDE_DIR AND ONNXRUNTIME_LIB))
 endif()
 message(STATUS "Found ONNX Runtime: ${ONNXRUNTIME_LIB}")
 
+file(GLOB ONNXRUNTIME_CUDA_PROVIDER
+    "${ONNXRUNTIME_ROOT}/lib/*onnxruntime_providers_cuda*"
+    "${ONNXRUNTIME_ROOT}/bin/*onnxruntime_providers_cuda*")
+if (ONNXRUNTIME_CUDA_PROVIDER)
+    message(STATUS "ONNX Runtime has the CUDA execution provider")
+else()
+    message(STATUS "ONNX Runtime is CPU-only")
+endif()
+
 # Windows has no rpath: onnxruntime.dll has to sit next to every executable that loads kokoro.dll.
 if (WIN32)
     get_filename_component(ONNXRUNTIME_LIB_DIR "${ONNXRUNTIME_LIB}" DIRECTORY)
@@ -68,6 +81,19 @@ if (WIN32)
     if (NOT ONNXRUNTIME_DLL)
         message(FATAL_ERROR "onnxruntime.dll not found next to ${ONNXRUNTIME_LIB}")
     endif()
+    get_filename_component(ONNXRUNTIME_DLL_DIR "${ONNXRUNTIME_DLL}" DIRECTORY)
+    # ORT loads providers from onnxruntime.dll's directory, so they must be copied together.
+    # onnxruntime_providers_tensorrt.dll is deliberately left out: TensorRT is not used.
+    # The prebuilt package puts the provider DLLs in bin/, a source build in lib/.
+    set(ONNXRUNTIME_RUNTIME_DLLS "${ONNXRUNTIME_DLL}")
+    foreach(provider shared cuda)
+        foreach(dir "${ONNXRUNTIME_DLL_DIR}" "${ONNXRUNTIME_ROOT}/lib")
+            if (EXISTS "${dir}/onnxruntime_providers_${provider}.dll")
+                list(APPEND ONNXRUNTIME_RUNTIME_DLLS "${dir}/onnxruntime_providers_${provider}.dll")
+                break()
+            endif()
+        endforeach()
+    endforeach()
 endif()
 
 # Internal implementation, linked into libkokoro and test_g2p.
@@ -104,8 +130,8 @@ set_target_properties(kokoro PROPERTIES
 
 if (WIN32)
     add_custom_command(TARGET kokoro POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${ONNXRUNTIME_DLL}" $<TARGET_FILE_DIR:kokoro>)
-    install(FILES "${ONNXRUNTIME_DLL}" DESTINATION ${CMAKE_INSTALL_BINDIR})
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ONNXRUNTIME_RUNTIME_DLLS} $<TARGET_FILE_DIR:kokoro>)
+    install(FILES ${ONNXRUNTIME_RUNTIME_DLLS} DESTINATION ${CMAKE_INSTALL_BINDIR})
 elseif (APPLE)
     target_link_libraries(kokoro PRIVATE "-framework Foundation" "-framework CoreFoundation")
     set_target_properties(kokoro PROPERTIES INSTALL_RPATH "@loader_path")

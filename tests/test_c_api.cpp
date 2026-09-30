@@ -35,6 +35,26 @@ TEST_CASE("create_reports_load_failure") {
     CHECK(kokoro_last_error()[0] != '\0');
 }
 
+TEST_CASE("create_ex_rejects_invalid_options") {
+    int sentinel = 0;
+    kokoro_ctx* ctx = reinterpret_cast<kokoro_ctx*>(&sentinel);
+    kokoro_options options = kokoro_default_options();
+
+    options.device = static_cast<kokoro_device>(7);
+    CHECK(kokoro_create_ex("m", "v", "d", &options, &ctx) == KOKORO_ERROR_INVALID_ARGUMENT);
+    CHECK(ctx == nullptr);
+
+    options = kokoro_default_options();
+    options.gpu_id = -1;
+    CHECK(kokoro_create_ex("m", "v", "d", &options, &ctx) == KOKORO_ERROR_INVALID_ARGUMENT);
+    CHECK(ctx == nullptr);
+
+    // Valid options reach load: nonexistent paths yield LOAD, not INVALID_ARGUMENT.
+    options = kokoro_default_options();
+    CHECK(kokoro_create_ex("m", "v", "d", &options, &ctx) == KOKORO_ERROR_LOAD);
+    CHECK(ctx == nullptr);
+}
+
 TEST_CASE("last_error_is_thread_local") {
     REQUIRE(kokoro_create("m", "v", "d", nullptr) == KOKORO_ERROR_INVALID_ARGUMENT);
 

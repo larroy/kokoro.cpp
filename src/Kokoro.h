@@ -20,6 +20,13 @@ const int MAX_PHONEME_LENGTH = 510; // Example value
 const int SAMPLE_RATE = 24000;      // Example value
 const int STYLE_DIM = 256;          // floats per style row; a voice is a table of these rows
 
+enum class InferenceDevice { Auto, Cpu, Cuda };
+
+struct InferenceConfig {
+    InferenceDevice device = InferenceDevice::Auto;
+    int gpu_id = 0;  // CUDA device ordinal
+};
+
 class Kokoro {
 public:
     /** \brief Constructs a Kokoro instance.
@@ -29,13 +36,17 @@ public:
      *  \param model_path Path to the ONNX model file (UTF-8).
      *  \param voices_path Path to the voices embeddings file (UTF-8).
      *  \param dict_dir Path to directory containing vocab.txt and G2P dictionaries (UTF-8).
+     *  \param inference Where inference runs (device and GPU ordinal).
      *
      *  \throws std::runtime_error if any required resource fails to load.
      */
-    Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& dict_dir);
-    
+    Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& dict_dir,
+           const InferenceConfig& inference);
+
     /** \brief Destroys the Kokoro instance and releases resources. */
     ~Kokoro();
+    // Cpu or Cuda: where the model runs.
+    InferenceDevice device() const { return device_; }
 
     /** \brief Retrieves a voice embedding by name.
      *
@@ -108,6 +119,7 @@ public:
 private:
     Ort::Env env_;
     Ort::Session session_{nullptr};
+    InferenceDevice device_ = InferenceDevice::Cpu;
     Ort::AllocatorWithDefaultOptions allocator_;
     
     // Placeholder for voices data: map from name to vector
@@ -116,6 +128,7 @@ private:
     std::unique_ptr<Tokenizer> tokenizer_;
     
     // Internal methods
+    void create_session(const std::string& model_path, const InferenceConfig& inference);
     void load_voices(const std::string& voices_path);
     
     std::pair<std::vector<float>, int> _create_audio(

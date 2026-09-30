@@ -7,6 +7,8 @@
 #include <cstring>
 #include <filesystem>
 #include <stdexcept>
+#include <cstdio>
+#include <algorithm>
 
 // Helper to trim audio (simple amplitude based silence removal)
 std::vector<float> trim_audio(const std::vector<float>& audio, int sample_rate, float threshold_db = 60.0f) {
@@ -17,19 +19,71 @@ std::vector<float> trim_audio(const std::vector<float>& audio, int sample_rate, 
 }
 
 // Paths cross the API as UTF-8; u8path keeps non-ASCII paths intact on Windows.
+namespace {
+
+bool cuda_provider_available() {
+    for (const auto& provider : Ort::GetAvailableProviders()) {
+        if (provider == "CUDAExecutionProvider") return true;
+    }
+    return false;
+}
+
+Ort::SessionOptions cpu_session_options() {
+    Ort::SessionOptions options;
+    options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+    return options;
+}
+
+Ort::SessionOptions cuda_session_options(int gpu_id) {
+    Ort::SessionOptions options = cpu_session_options();
+    Ort::CUDAProviderOptions cuda;
+    cuda.Update({{"device_id", std::to_string(gpu_id)}, {"cudnn_conv_algo_search", "HEURISTIC"}});
+    options.AppendExecutionProvider_CUDA_V2(*cuda);
+    return options;
+}
+
+}  // namespace
+
+// HEURISTIC: every chunk length is a new input shape; the default EXHAUSTIVE search would re-benchmark
+// each convolution per shape.
 static std::filesystem::path utf8_path(const std::string& path) {
     return std::filesystem::u8path(path);
 }
 
-Kokoro::Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& dict_dir)
+void Kokoro::create_session(const std::string& model_path, const InferenceConfig& inference) {
+    const auto path = utf8_path(model_path);
+    if (!std::filesystem::is_regular_file(path)) {
+        throw std::runtime_error("Model file not found: " + model_path);
+    }
+    const bool has_cuda = cuda_provider_available();
+    const auto build_cpu_session = [&]() {
+        session_ = Ort::Session(env_, path.c_str(), cpu_session_options());
+        device_ = InferenceDevice::Cpu;
+    };
+    if (inference.device == InferenceDevice::Cpu || (inference.device == InferenceDevice::Auto && !has_cuda)) {
+        build_cpu_session();
+        return;
+    }
+    if (!has_cuda) {
+        throw std::runtime_error(
+            "this ONNX Runtime build has no CUDA support; install it with `uv run bootstrap.py configure --ort gpu` "
+            "or `uv run bootstrap.py build-ort`");
+    }
+    try {
+        session_ = Ort::Session(env_, path.c_str(), cuda_session_options(inference.gpu_id));
+        device_ = InferenceDevice::Cuda;
+    } catch (const Ort::Exception& e) {
+        if (inference.device == InferenceDevice::Cuda) throw;
+        std::fprintf(stderr, "kokoro: CUDA unavailable, using CPU: %s\n", e.what());
+        build_cpu_session();
+    }
+}
+
+Kokoro::Kokoro(const std::string& model_path, const std::string& voices_path, const std::string& dict_dir,
+               const InferenceConfig& inference)
     : env_(ORT_LOGGING_LEVEL_WARNING, "Kokoro")
 {
-    // Initialize session options
-    Ort::SessionOptions session_options;
-    session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-
-    // Load model
-    session_ = Ort::Session(env_, utf8_path(model_path).c_str(), session_options);
+    create_session(model_path, inference);
 
     // Load voices
     load_voices(voices_path);

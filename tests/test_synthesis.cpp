@@ -239,6 +239,21 @@ TEST_CASE("style_row_follows_token_count") {
     kokoro_destroy(ctx);
 }
 
+TEST_CASE("cpu_device_is_honored") {
+    kokoro_options options = kokoro_default_options();
+    options.device = KOKORO_DEVICE_CPU;
+    kokoro_ctx* ctx = nullptr;
+    REQUIRE_MESSAGE(kokoro_create_ex(g_model_path, g_voices_path, g_dict_dir, &options, &ctx) == KOKORO_OK,
+                    kokoro_last_error());
+    CHECK(kokoro_context_device(ctx) == KOKORO_DEVICE_CPU);
+
+    kokoro_status status = KOKORO_ERROR_UNKNOWN;
+    const std::vector<float> samples = synth(ctx, kText, kVoice, 1.0f, 0, &status);
+    CHECK(status == KOKORO_OK);
+    CHECK(!samples.empty());
+    kokoro_destroy(ctx);
+}
+
 int main(int argc, char** argv) {
     if (argc < 4) {
         std::fprintf(stderr, "usage: test_synthesis <model.onnx> <voices.bin> <dict_dir> [doctest options]\n");

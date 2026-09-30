@@ -13,8 +13,8 @@ struct kokoro_ctx {
     Kokoro tts;
     std::vector<std::string> voice_names;
 
-    kokoro_ctx(const char* model, const char* voices, const char* dict_dir)
-        : tts(model, voices, dict_dir), voice_names(tts.voice_names()) {}
+    kokoro_ctx(const char* model, const char* voices, const char* dict_dir, const InferenceConfig& inference)
+        : tts(model, voices, dict_dir, inference), voice_names(tts.voice_names()) {}
 };
 
 namespace {
@@ -24,6 +24,21 @@ thread_local std::string g_last_error;
 kokoro_status fail(kokoro_status status, const char* message) {
     g_last_error = message;
     return status;
+}
+
+bool to_inference_config(const kokoro_options& options, InferenceConfig& config) {
+    switch (options.device) {
+        case KOKORO_DEVICE_AUTO: config.device = InferenceDevice::Auto; break;
+        case KOKORO_DEVICE_CPU: config.device = InferenceDevice::Cpu; break;
+        case KOKORO_DEVICE_CUDA: config.device = InferenceDevice::Cuda; break;
+        default: return false;
+    }
+    config.gpu_id = options.gpu_id;
+    return true;
+}
+
+kokoro_device to_c_device(InferenceDevice device) {
+    return device == InferenceDevice::Cuda ? KOKORO_DEVICE_CUDA : KOKORO_DEVICE_CPU;
 }
 
 // Maps an in-flight exception to a status; `fallback` classifies runtime failures by call site.
@@ -51,19 +66,40 @@ const char* kokoro_last_error(void) {
     return g_last_error.c_str();
 }
 
-kokoro_status kokoro_create(const char* model_path, const char* voices_path, const char* dict_dir,
-                            kokoro_ctx** out_ctx) {
+kokoro_status kokoro_create_ex(const char* model_path, const char* voices_path, const char* dict_dir,
+                               const kokoro_options* options, kokoro_ctx** out_ctx) {
     if (!out_ctx) return fail(KOKORO_ERROR_INVALID_ARGUMENT, "out_ctx is NULL");
     *out_ctx = nullptr;
     if (!model_path || !voices_path || !dict_dir) {
         return fail(KOKORO_ERROR_INVALID_ARGUMENT, "model_path, voices_path and dict_dir must not be NULL");
     }
+    const kokoro_options resolved = options ? *options : kokoro_default_options();
+    InferenceConfig config;
+    if (!to_inference_config(resolved, config)) {
+        return fail(KOKORO_ERROR_INVALID_ARGUMENT, "unknown device");
+    }
+    if (resolved.gpu_id < 0) {
+        return fail(KOKORO_ERROR_INVALID_ARGUMENT, "gpu_id must be >= 0");
+    }
     try {
-        *out_ctx = new kokoro_ctx(model_path, voices_path, dict_dir);
+        *out_ctx = new kokoro_ctx(model_path, voices_path, dict_dir, config);
     } catch (...) {
         return fail_current_exception(KOKORO_ERROR_LOAD);
     }
     return KOKORO_OK;
+}
+
+kokoro_status kokoro_create(const char* model_path, const char* voices_path, const char* dict_dir,
+                            kokoro_ctx** out_ctx) {
+    return kokoro_create_ex(model_path, voices_path, dict_dir, nullptr, out_ctx);
+}
+
+kokoro_options kokoro_default_options(void) {
+    return kokoro_options{KOKORO_DEVICE_AUTO, 0};
+}
+
+kokoro_device kokoro_context_device(const kokoro_ctx* ctx) {
+    return ctx ? to_c_device(ctx->tts.device()) : KOKORO_DEVICE_AUTO;
 }
 
 void kokoro_destroy(kokoro_ctx* ctx) {

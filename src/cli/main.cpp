@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -25,6 +26,8 @@ struct Options {
     float speed = 1.0f;
     kokoro_number_language number_language = KOKORO_NUMBERS_AUTO;  // --lang
     std::string output = "output.wav";
+    kokoro_device device = KOKORO_DEVICE_AUTO;
+    int gpu_id = 0;
     bool input_phonemes = false;  // -p/--phonemes
     bool phonemize = false;       // --phonemize
     bool list_voices = false;     // --list-voices
@@ -35,7 +38,8 @@ struct Options {
     std::string text;
 };
 
-enum class Opt { Model, Voices, Dict, Voice, Lang, Speed, Output, Phonemes, Phonemize, ListVoices, Interactive, Help, Version };
+ enum class Opt { Model, Voices, Dict, Voice, Lang, Speed, Output, Device, GpuId, Phonemes, Phonemize,
+                  ListVoices, Interactive, Help, Version };
 
 struct OptionSpec {
     const char* short_name;  // nullptr if the option has no short form
@@ -52,6 +56,8 @@ constexpr OptionSpec kOptions[] = {
     {nullptr, "--lang", Opt::Lang, true},
     {"-s", "--speed", Opt::Speed, true},
     {"-o", "--output", Opt::Output, true},
+    {nullptr, "--device", Opt::Device, true},
+    {nullptr, "--gpu-id", Opt::GpuId, true},
     {"-p", "--phonemes", Opt::Phonemes, false},
     {nullptr, "--phonemize", Opt::Phonemize, false},
     {nullptr, "--list-voices", Opt::ListVoices, false},
@@ -82,7 +88,9 @@ void print_usage(std::FILE* out) {
         "  -v, --voice <name>    voice to use (default: af_maple)\n"
         "      --lang <auto|en|zh>  language for reading numbers (default: auto)\n"
         "  -s, --speed <rate>    speaking rate, > 0 (default: 1.0)\n"
-        "  -o, --output <path>   output WAV file (default: output.wav; unused with -i)\n"
+"  -o, --output <path>   output WAV file (default: output.wav; unused with -i)\n"
+        "      --device <name>   auto, cpu or cuda (default: auto)\n"
+        "      --gpu-id <n>      CUDA device to use (default: 0)\n"
         "  -p, --phonemes        <text> is a phoneme string; skip G2P\n"
         "      --phonemize       print the phonemes for <text> instead of synthesizing\n"
         "      --list-voices     print the available voices and exit\n"
@@ -103,6 +111,22 @@ bool parse_number_language(const std::string& value, kokoro_number_language& lan
     if (value == "en") { language = KOKORO_NUMBERS_ENGLISH; return true; }
     if (value == "zh") { language = KOKORO_NUMBERS_CHINESE; return true; }
     return false;
+}
+
+bool parse_device(const std::string& value, kokoro_device& device) {
+    if (value == "auto") { device = KOKORO_DEVICE_AUTO; return true; }
+    if (value == "cpu") { device = KOKORO_DEVICE_CPU; return true; }
+    if (value == "cuda") { device = KOKORO_DEVICE_CUDA; return true; }
+    return false;
+}
+
+bool parse_gpu_id(const std::string& value, int& gpu_id) {
+    if (value.empty()) return false;
+    char* end = nullptr;
+    const long parsed = std::strtol(value.c_str(), &end, 10);
+    if (end != value.c_str() + value.size() || parsed < 0 || parsed > INT_MAX) return false;
+    gpu_id = static_cast<int>(parsed);
+    return true;
 }
 
 // Returns false after printing a usage error.
@@ -156,6 +180,16 @@ bool parse_args(const std::vector<std::string>& args, Options& opt) {
                 }
                 break;
             case Opt::Output: opt.output = value; break;
+            case Opt::Device:
+                if (!parse_device(value, opt.device)) {
+                    return usage_error("invalid device '" + value + "' (expected auto, cpu or cuda)");
+                }
+                break;
+            case Opt::GpuId:
+                if (!parse_gpu_id(value, opt.gpu_id)) {
+                    return usage_error("invalid GPU id '" + value + "' (must be an integer >= 0)");
+                }
+                break;
             case Opt::Speed:
                 if (!kokoro_cli::parse_speed(value, opt.speed)) {
                     return usage_error("invalid speed '" + value + "' (must be a number > 0)");
@@ -240,10 +274,21 @@ double elapsed_s(Clock::time_point start) {
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
 
+const char* device_name(kokoro_device device) {
+    switch (device) {
+        case KOKORO_DEVICE_CUDA: return "cuda";
+        case KOKORO_DEVICE_CPU: return "cpu";
+        default: return "auto";
+    }
+}
+
 int run(const Options& opt) {
     const auto init_start = Clock::now();
+    kokoro_options options = kokoro_default_options();
+    options.device = opt.device;
+    options.gpu_id = opt.gpu_id;
     kokoro_ctx* raw_ctx = nullptr;
-    if (kokoro_create(opt.model.c_str(), opt.voices.c_str(), opt.dict.c_str(), &raw_ctx) != KOKORO_OK) {
+    if (kokoro_create_ex(opt.model.c_str(), opt.voices.c_str(), opt.dict.c_str(), &options, &raw_ctx) != KOKORO_OK) {
         return library_error();
     }
     const std::unique_ptr<kokoro_ctx, decltype(&kokoro_destroy)> ctx(raw_ctx, &kokoro_destroy);
@@ -283,8 +328,8 @@ int run(const Options& opt) {
         std::fprintf(stderr, "kokoro: %s\n", error.c_str());
         return 1;
     }
-    std::fprintf(stderr, "Wrote %s (%.2f s audio, %d Hz, synthesis %.3f s)\n", opt.output.c_str(), seconds, sample_rate,
-                 synth_s);
+    std::fprintf(stderr, "Wrote %s (%.2f s audio, %d Hz, synthesis %.3f s, %s)\n", opt.output.c_str(), seconds,
+                 sample_rate, synth_s, device_name(kokoro_context_device(ctx.get())));
     return 0;
 }
 

@@ -50,6 +50,18 @@ typedef enum kokoro_number_language {
 
 typedef struct kokoro_ctx kokoro_ctx;
 
+/* Where inference runs. */
+typedef enum kokoro_device {
+    KOKORO_DEVICE_AUTO = 0, /* CUDA if this build's ONNX Runtime supports it and it initializes, else CPU */
+    KOKORO_DEVICE_CPU = 1,
+    KOKORO_DEVICE_CUDA = 2  /* fail with KOKORO_ERROR_LOAD instead of falling back to CPU */
+} kokoro_device;
+
+typedef struct kokoro_options {
+    kokoro_device device;
+    int gpu_id; /* CUDA device ordinal, >= 0; ignored on CPU */
+} kokoro_options;
+
 /* Mono float PCM owned by the library; release with kokoro_audio_free(). */
 typedef struct kokoro_audio {
     float* samples;
@@ -70,9 +82,24 @@ KOKORO_API const char* kokoro_last_error(void);
  * Loads the ONNX model, the voices file and the dictionaries in dict_dir
  * (vocab.txt, jieba, pinyin, CMU and g2p_en files; see dict/ in the repo).
  * On success stores the new context in *out_ctx.
+ * Same as kokoro_create_ex(model_path, voices_path, dict_dir, NULL, out_ctx).
  */
 KOKORO_API kokoro_status kokoro_create(const char* model_path, const char* voices_path, const char* dict_dir,
                                        kokoro_ctx** out_ctx);
+
+/*
+ * kokoro_create with explicit options; NULL options means kokoro_default_options().
+ * With KOKORO_DEVICE_AUTO a CUDA initialization failure is reported on stderr and the
+ * context runs on the CPU.
+ */
+KOKORO_API kokoro_status kokoro_create_ex(const char* model_path, const char* voices_path, const char* dict_dir,
+                                          const kokoro_options* options, kokoro_ctx** out_ctx);
+
+/* KOKORO_DEVICE_CPU or KOKORO_DEVICE_CUDA: where ctx runs inference. KOKORO_DEVICE_AUTO for NULL. */
+KOKORO_API kokoro_device kokoro_context_device(const kokoro_ctx* ctx);
+
+/* KOKORO_DEVICE_AUTO on GPU 0. */
+KOKORO_API kokoro_options kokoro_default_options(void);
 
 /* Frees the context. NULL is ignored. */
 KOKORO_API void kokoro_destroy(kokoro_ctx* ctx);
