@@ -107,6 +107,20 @@ TEST_CASE("single_letter_words") {
     check_g2p(cases);
 }
 
+TEST_CASE("english_apostrophes") {
+    static const Case cases[] = {
+        {"What's the weather today?", "wˈʌts ðə wˈɛðəɹ tədˈA?"},  // CMU contraction
+        {"I don't know.", "ˈI dˈOnt nˈO."},
+        {"It’s mine.", "ˈɪts mˈIn."},                              // curly apostrophe
+        {"rock'n'roll", "ɹˈɑkənɹˈOl"},                             // chained apostrophes
+        {"Kokoro's", "kˈOkOɹOz"},                                  // OOV possessive: z after vowel
+        {"laptop's", "lˈæptˌɑps"},                                 // s after voiceless
+        {"onnx's", "ˈɑnɪksɪz"},                                    // ɪz after sibilant
+        {"GPU's", "ʤˈipˈijˈuz"},                                   // acronym stem
+    };
+    check_g2p(cases);
+}
+
 TEST_CASE("mixed_language") {
     static const Case cases[] = {
         {"中国", "ʈʂʊ→ŋkwo↗"},

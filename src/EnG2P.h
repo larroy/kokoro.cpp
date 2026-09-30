@@ -20,57 +20,72 @@ public:
         if (!neural_model_path.empty()) neural_.load(neural_model_path);
     }
 
-    std::string convert(const std::string& word) {
-        std::string upper_word = word;
-        // Simple strip of punctuation if needed? 
-        // But let's just assume the input is somewhat clean or strict match first.
-        
-        // Trim common punctuation from ends just in case
+    std::string convert(const std::string& word) const {
         size_t start = 0;
-        while (start < upper_word.size() && !isalnum((unsigned char)upper_word[start])) start++;
-        size_t end = upper_word.size();
-        while (end > start && !isalnum((unsigned char)upper_word[end-1])) end--;
-        
-        std::string clean_word = upper_word.substr(start, end - start);
-        std::string prefix = upper_word.substr(0, start);
-        std::string suffix = upper_word.substr(end);
-        
-        const std::string original = clean_word;
-        std::transform(clean_word.begin(), clean_word.end(), clean_word.begin(), ::toupper);
-        
-        // std::cout << "Debug EnG2P: Query [" << clean_word << "]" << std::endl;
-        
-        auto it = dict_.find(clean_word);
-        if (it != dict_.end()) {
-            return prefix + arpabet_to_ipa(it->second) + suffix;
-        }
-
-        if (clean_word.empty()) return word;
-        const auto is_upper = [](unsigned char c) { return c >= 'A' && c <= 'Z'; };
-        const bool letters_only = std::all_of(clean_word.begin(), clean_word.end(), is_upper);
-
-        // Short all-caps words (GPU, API) are acronyms: spell them. Also the fallback
-        // for any unknown word when no neural model is loaded.
-        const bool acronym = letters_only && original.size() <= MAX_ACRONYM_LENGTH &&
-                             std::all_of(original.begin(), original.end(), is_upper);
-        if (letters_only && (acronym || !neural_.loaded())) {
-            std::string spelled;
-            for (char c : clean_word) spelled += arpabet_to_ipa(LETTER_NAMES[c - 'A']);
-            return prefix + spelled + suffix;
-        }
-
-        const bool word_chars = std::all_of(clean_word.begin(), clean_word.end(),
-                                            [&](unsigned char c) { return is_upper(c) || c == '\''; });
-        if (word_chars && neural_.loaded()) {
-            std::string lower = clean_word;
-            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-            return prefix + arpabet_to_ipa(neural_.predict(lower)) + suffix;
-        }
-
-        return word;
+        while (start < word.size() && !isalnum(static_cast<unsigned char>(word[start]))) start++;
+        size_t end = word.size();
+        while (end > start && !isalnum(static_cast<unsigned char>(word[end - 1]))) end--;
+        const std::vector<std::string> phonemes = lookup(word.substr(start, end - start));
+        if (phonemes.empty()) return word;
+        return word.substr(0, start) + arpabet_to_ipa(phonemes) + word.substr(end);
     }
 
 private:
+    // word: trimmed of surrounding punctuation, original case. Empty result: no pronunciation.
+    std::vector<std::string> lookup(const std::string& word) const {
+        std::string upper = word;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        const auto it = dict_.find(upper);
+        if (it != dict_.end()) return it->second;
+        if (upper.empty()) return {};
+        if (auto possessive = lookup_possessive(word); !possessive.empty()) return possessive;
+
+        const auto is_upper = [](unsigned char c) { return c >= 'A' && c <= 'Z'; };
+        const bool letters_only = std::all_of(upper.begin(), upper.end(), is_upper);
+        // Short all-caps words (GPU, API) are acronyms: spell them. Also the fallback
+        // for any unknown word when no neural model is loaded.
+        const bool acronym = letters_only && word.size() <= MAX_ACRONYM_LENGTH &&
+                             std::all_of(word.begin(), word.end(), is_upper);
+        if (letters_only && (acronym || !neural_.loaded())) return spell(upper);
+
+        const bool word_chars = std::all_of(upper.begin(), upper.end(),
+                                            [&](unsigned char c) { return is_upper(c) || c == '\''; });
+        if (!word_chars || !neural_.loaded()) return {};
+        std::string lower = upper;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        return neural_.predict(lower);
+    }
+
+    // "Pedro's", "GPU's" missing from the dicts: stem pronunciation plus the English -s suffix.
+    std::vector<std::string> lookup_possessive(const std::string& word) const {
+        const size_t n = word.size();
+        if (n <= 2 || word[n - 2] != '\'' || (word[n - 1] != 's' && word[n - 1] != 'S')) return {};
+        std::vector<std::string> phonemes = lookup(word.substr(0, n - 2));
+        if (phonemes.empty()) return {};
+        const std::vector<std::string> suffix = s_suffix(phonemes.back());
+        phonemes.insert(phonemes.end(), suffix.begin(), suffix.end());
+        return phonemes;
+    }
+
+    // -s allomorph: ɪz after sibilants, s after voiceless consonants, z otherwise.
+    static std::vector<std::string> s_suffix(std::string last) {
+        if (!last.empty() && isdigit(static_cast<unsigned char>(last.back()))) last.pop_back();
+        static const std::unordered_set<std::string> SIBILANT = {"S", "Z", "SH", "ZH", "CH", "JH"};
+        static const std::unordered_set<std::string> VOICELESS = {"P", "T", "K", "F", "TH"};
+        if (SIBILANT.count(last)) return {"IH0", "Z"};
+        if (VOICELESS.count(last)) return {"S"};
+        return {"Z"};
+    }
+
+    static std::vector<std::string> spell(const std::string& upper) {
+        std::vector<std::string> phonemes;
+        for (char c : upper) {
+            const auto& letter = LETTER_NAMES[c - 'A'];
+            phonemes.insert(phonemes.end(), letter.begin(), letter.end());
+        }
+        return phonemes;
+    }
+
     std::unordered_map<std::string, std::vector<std::string>> dict_;
     NeuralG2P neural_;
     static constexpr size_t MAX_ACRONYM_LENGTH = 5;

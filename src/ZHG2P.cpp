@@ -276,6 +276,7 @@ std::string ZHG2P::map_punctuation(std::string text) {
     text = replace_all(text, u8"】", u8"” ");
     text = replace_all(text, u8"（", " (");
     text = replace_all(text, u8"）", ") ");
+    text = replace_all(text, u8"’", "'");
     
     size_t first = text.find_first_not_of(" \t\n\r");
     if (std::string::npos == first) return text;

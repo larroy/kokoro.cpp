@@ -67,7 +67,7 @@ public:
             
             result.push_back({word, tag});
         }
-        return result;
+        return join_apostrophe_words(std::move(result));
     }
 
     std::vector<std::string> word_to_pinyin(const std::string& word) override {
@@ -79,6 +79,25 @@ public:
     }
 
 private:
+    // cppjieba splits "What's" into What / ' / s. Re-join letter-apostrophe-letter runs
+    // (contractions, possessives, rock'n'roll) so the English G2P sees the whole word.
+    static std::vector<std::pair<std::string, std::string>> join_apostrophe_words(
+            std::vector<std::pair<std::string, std::string>> words) {
+        std::vector<std::pair<std::string, std::string>> joined;
+        joined.reserve(words.size());
+        for (size_t i = 0; i < words.size(); ++i) {
+            const bool bridge = words[i].first == "'" && i + 1 < words.size() && !joined.empty() &&
+                                joined.back().second == "eng" && words[i + 1].second == "eng";
+            if (bridge) {
+                joined.back().first += "'" + words[i + 1].first;
+                ++i;
+            } else {
+                joined.push_back(std::move(words[i]));
+            }
+        }
+        return joined;
+    }
+
     // cppjieba aborts the process on a missing dictionary; fail with an exception first.
     static const std::string& require_file(const std::string& path) {
         if (!std::ifstream(path).is_open()) {
