@@ -52,6 +52,8 @@ ctest --test-dir build -C Release --output-on-failure
 
 Tests live in `tests/` (doctest, vendored in `third_party/doctest`): `c_api` checks the C API without a model, `g2p` pins the Chinese/English G2P output, and `synthesis` runs the real model from `models/` (skipped if the model or voices file is missing). Configure with `-DKOKORO_BUILD_TESTS=OFF` to skip building them.
 
+The Python tools have their own tests in `tests/python/`: run `uv run pytest`. The `.pt` import tests are skipped unless PyTorch is installed; `uv run --group voice pytest` runs them too.
+
 ## Library
 
 `libkokoro` exposes a C API in [`include/kokoro/kokoro.h`](include/kokoro/kokoro.h), so it can be used from C, C++ or any language with a C FFI (Python `ctypes`, C#, Rust, Go, ...):
@@ -145,7 +147,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/Kokoro.cpp/h`: main TTS class (internal).
 - `src/ZHFrontend.cpp/h`: Chinese frontend (G2P, tone sandhi).
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
-- `tests/`: library tests (run with `ctest`).
+- `tests/`: library tests (run with `ctest`); `tests/python/`: tests for the Python tools (run with `uv run pytest`).
 - `docs/`: guides ([adding voices](docs/adding-voices.md)).
 - `scripts/`: helper scripts for data processing.
 - `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
@@ -209,6 +211,8 @@ ctest --test-dir build -C Release --output-on-failure
 ```
 
 测试位于 `tests/`（使用 doctest，已内置于 `third_party/doctest`）：`c_api` 在无模型的情况下检查 C API，`g2p` 固定中英文 G2P 的输出，`synthesis` 使用 `models/` 中的真实模型运行（模型或语音文件不存在时跳过）。配置时传入 `-DKOKORO_BUILD_TESTS=OFF` 可不编译测试。
+
+Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` 导入测试在未安装 PyTorch 时跳过；`uv run --group voice pytest` 会一并运行。
 
 ## 库
 
@@ -303,7 +307,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/Kokoro.cpp/h`: 主要的 TTS 类（内部实现）。
 - `src/ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
-- `tests/`: 库测试（使用 `ctest` 运行）。
+- `tests/`: 库测试（使用 `ctest` 运行）；`tests/python/`：Python 工具的测试（使用 `uv run pytest` 运行）。
 <<<<<<< HEAD
 - `bootstrap.py`: 下载依赖（`configure`）并运行 CMake（`build`）。
 =======
