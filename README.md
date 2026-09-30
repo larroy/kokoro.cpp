@@ -12,6 +12,7 @@ A high-performance, lightweight C++ inference implementation of the [Kokoro](htt
 ## Requirements
 
 - **CMake** (3.15+)
+- **Ninja** (recommended; `python setup.py build` uses it when it is in `PATH`)
 - **C++ compiler** (C++17 support required)
 - **Python 3** with [click](https://click.palletsprojects.com/) (`pip install click`) for `setup.py`
 
@@ -34,10 +35,10 @@ Files that are already present and up to date are skipped; `--force` downloads t
 python setup.py build
 ```
 
-`build` runs the CMake configure and build steps. Options: `--build-dir` (default `build`), `--config` (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`; default `Release`), `-j/--jobs`. Arguments after `--` go to the CMake configure step, e.g. `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`. It is equivalent to:
+`build` runs the CMake configure and build steps with the Ninja generator. If `ninja` is not in `PATH` it prints a warning and falls back to CMake's default generator; passing `-G` after `--` overrides the choice. Options: `--build-dir` (default `build`), `--config` (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`; default `Release`), `-j/--jobs`. Arguments after `--` go to the CMake configure step, e.g. `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`. A build directory can't switch generators: delete it first if it was configured with another one. On Windows, Ninja needs the MSVC environment (run from a Developer Command Prompt). It is equivalent to:
 
 ```bash
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
 ```
 
@@ -167,6 +168,7 @@ MIT
 ## 依赖环境
 
 - **CMake** (3.15+)
+- **Ninja**（推荐；`python setup.py build` 在 `PATH` 中找到它时使用）
 - **C++ 编译器** (需要支持 C++17)
 - **Python 3** 及 [click](https://click.palletsprojects.com/)（`pip install click`），用于 `setup.py`
 
@@ -189,10 +191,10 @@ python setup.py configure
 python setup.py build
 ```
 
-`build` 执行 CMake 的配置和编译。选项：`--build-dir`（默认 `build`）、`--config`（`Debug`、`Release`、`RelWithDebInfo`、`MinSizeRel`，默认 `Release`）、`-j/--jobs`。`--` 之后的参数会传给 CMake 配置步骤，例如 `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`。等价于：
+`build` 使用 Ninja 生成器执行 CMake 的配置和编译。若 `PATH` 中没有 `ninja`，会打印警告并回退到 CMake 默认生成器；在 `--` 之后传入 `-G` 可覆盖该选择。选项：`--build-dir`（默认 `build`）、`--config`（`Debug`、`Release`、`RelWithDebInfo`、`MinSizeRel`，默认 `Release`）、`-j/--jobs`。`--` 之后的参数会传给 CMake 配置步骤，例如 `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`。构建目录不能更换生成器：若之前用其他生成器配置过，需先删除。Windows 下 Ninja 需要 MSVC 环境（在 Developer Command Prompt 中运行）。等价于：
 
 ```bash
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
 ```
 

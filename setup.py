@@ -192,7 +192,7 @@ def configure(force):
 @click.option("-j", "--jobs", type=click.IntRange(min=1), help="Parallel build jobs.")
 @click.argument("cmake_args", nargs=-1, type=click.UNPROCESSED)
 def build(build_dir, config, jobs, cmake_args):
-    """Configure and build with CMake.
+    """Configure and build with CMake, using the Ninja generator if available.
 
     Extra arguments after `--` are passed to the CMake configure step,
     e.g. `python setup.py build -- -DKOKORO_BUILD_TESTS=OFF`.
@@ -200,7 +200,15 @@ def build(build_dir, config, jobs, cmake_args):
     cmake = shutil.which("cmake")
     if cmake is None:
         raise click.ClickException("cmake not found in PATH")
-    run([cmake, "-S", str(ROOT), "-B", build_dir, f"-DCMAKE_BUILD_TYPE={config}", *cmake_args])
+    generator = []
+    if not any(arg.startswith("-G") for arg in cmake_args):
+        if shutil.which("ninja"):
+            generator = ["-G", "Ninja"]
+        else:
+            click.secho("Warning: ninja not found in PATH, using the default CMake generator.",
+                        fg="yellow", err=True)
+    run([cmake, "-S", str(ROOT), "-B", build_dir, *generator, f"-DCMAKE_BUILD_TYPE={config}",
+         *cmake_args])
     build_cmd = [cmake, "--build", build_dir, "--config", config, "--parallel"]
     if jobs:
         build_cmd.append(str(jobs))
