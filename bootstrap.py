@@ -108,6 +108,9 @@ def ort_archive() -> tuple:
 
 def strip_top_dir(name: str) -> str:
     """'onnxruntime-linux-x64-1.23.2/lib/x.so' -> 'lib/x.so'."""
+    # Strip leading ./ if present
+    if name.startswith("./"):
+        name = name[2:]
     parts = name.split("/", 1)
     return parts[1] if len(parts) == 2 else ""
 
