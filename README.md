@@ -104,7 +104,7 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 | `-m, --model <path>` | ONNX model file (default: `models/kokoro-v1.1-zh.onnx`) |
 | `--voices <path>` | voices file (default: `models/voices-v1.1-zh.bin`) |
 | `-d, --dict <dir>` | dictionary directory (default: `dict`) |
-| `-v, --voice <name>` | voice (default: `zf_002`); English voices: `af_maple`, `af_sol`, `bf_vale` |
+| `-v, --voice <name>` | voice (default: `af_maple`); English voices: `af_maple`, `af_sol`, `bf_vale`; Chinese voices: `zf_*`, `zm_*` |
 | `-s, --speed <rate>` | speaking rate, > 0 (default: `1.0`) |
 | `-o, --output <path>` | output WAV file (default: `output.wav`) |
 | `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
@@ -114,8 +114,8 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 ### Example
 
 ```bash
-./build/kokoro "你好啊，这是一个测试。Hello world"
-./build/kokoro --voice af_maple -o hello.wav "Hello world"
+./build/kokoro -o hello.wav "Hello world"
+./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
 ./build/kokoro --phonemize "中国"
 ```
 
@@ -260,7 +260,7 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 | `-m, --model <路径>` | ONNX 模型文件（默认：`models/kokoro-v1.1-zh.onnx`） |
 | `--voices <路径>` | 语音文件（默认：`models/voices-v1.1-zh.bin`） |
 | `-d, --dict <目录>` | 词典目录（默认：`dict`） |
-| `-v, --voice <名称>` | 语音（默认：`zf_002`）；英文语音：`af_maple`、`af_sol`、`bf_vale` |
+| `-v, --voice <名称>` | 语音（默认：`af_maple`）；英文语音：`af_maple`、`af_sol`、`bf_vale`；中文语音：`zf_*`、`zm_*` |
 | `-s, --speed <语速>` | 语速，须 > 0（默认：`1.0`） |
 | `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
 | `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
@@ -270,8 +270,8 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 ### 示例
 
 ```bash
-./build/kokoro "你好啊，这是一个测试。Hello world"
-./build/kokoro --voice af_maple -o hello.wav "Hello world"
+./build/kokoro -o hello.wav "Hello world"
+./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
 ./build/kokoro --phonemize "中国"
 ```
 

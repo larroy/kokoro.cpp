@@ -22,7 +22,7 @@ struct Options {
     std::string model = "models/kokoro-v1.1-zh.onnx";
     std::string voices = "models/voices-v1.1-zh.bin";
     std::string dict = "dict";
-    std::string voice = "zf_002";
+    std::string voice = "af_maple";
     float speed = 1.0f;
     std::string output = "output.wav";
     bool input_phonemes = false;  // -p/--phonemes
@@ -75,7 +75,7 @@ void print_usage(std::FILE* out) {
         "  -m, --model <path>    ONNX model file (default: models/kokoro-v1.1-zh.onnx)\n"
         "      --voices <path>   voices file (default: models/voices-v1.1-zh.bin)\n"
         "  -d, --dict <dir>      dictionary directory (default: dict)\n"
-        "  -v, --voice <name>    voice to use (default: zf_002)\n"
+        "  -v, --voice <name>    voice to use (default: af_maple)\n"
         "  -s, --speed <rate>    speaking rate, > 0 (default: 1.0)\n"
         "  -o, --output <path>   output WAV file (default: output.wav)\n"
         "  -p, --phonemes        <text> is a phoneme string; skip G2P\n"
