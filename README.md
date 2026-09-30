@@ -111,6 +111,8 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 | `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
 | `--list-voices` | print the available voices |
 
+To add your own voices (blends, imported `.pt` tensors), see [docs/adding-voices.md](docs/adding-voices.md).
+
 ### Example
 
 ```bash
@@ -144,7 +146,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/ZHFrontend.cpp/h`: Chinese frontend (G2P, tone sandhi).
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
 - `tests/`: library tests (run with `ctest`).
-- `setup.py`: downloads dependencies (`configure`) and runs CMake (`build`).
+- `docs/`: guides ([adding voices](docs/adding-voices.md)).
 - `scripts/`: helper scripts for data processing.
 - `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
 
@@ -267,6 +269,8 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 | `--phonemize` | 输出 `<文本>` 的音素而不合成 |
 | `--list-voices` | 列出可用语音 |
 
+如需添加自定义语音（混合语音、导入 `.pt` 张量），请参阅 [docs/adding-voices.md](docs/adding-voices.md)（英文）。
+
 ### 示例
 
 ```bash
@@ -300,7 +304,11 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
 - `tests/`: 库测试（使用 `ctest` 运行）。
+<<<<<<< HEAD
 - `setup.py`: 下载依赖（`configure`）并运行 CMake（`build`）。
+=======
+- `docs/`: 使用指南（[添加语音](docs/adding-voices.md)）。
+>>>>>>> 5c019f4 (docs: add guide for adding voices)
 - `scripts/`: 数据处理辅助脚本。
 - `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
 
