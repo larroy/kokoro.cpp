@@ -40,24 +40,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.13"
           architecture: ${{ matrix.arch }}
-
-      - name: Install setup.py dependencies
-        run: python -m pip install click
 
       - name: Cache model and voices
         uses: actions/cache@v6
         with:
           path: models
-          key: kokoro-models-${{ hashFiles('setup.py') }}
+          key: kokoro-models-${{ hashFiles('bootstrap.py') }}
           restore-keys: kokoro-models-
           enableCrossOsArchive: true
 
       - name: Download ONNX Runtime, model and voices
-        run: python setup.py configure
+        run: uv run bootstrap.py configure
 
       - name: Locate MSVC
         if: runner.os == 'Windows'
@@ -72,11 +70,11 @@ jobs:
         shell: cmd
         run: |
           call "%VCVARSALL%" ${{ matrix.arch }} || exit /b 1
-          python setup.py build
+          uv run bootstrap.py build
 
       - name: Build
         if: runner.os != 'Windows'
-        run: python setup.py build
+        run: uv run bootstrap.py build
 
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
