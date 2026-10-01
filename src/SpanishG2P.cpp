@@ -126,9 +126,15 @@ Unit read_letter(const std::u16string& w, size_t& i) {
     }
 }
 
+// Word-initial "ps" and "gn" drop their first letter: "psicología" -> sikoloxˈia, "gnomo" -> nˈomo.
+size_t silent_prefix(const std::u16string& word) {
+    const std::u16string start = word.substr(0, 2);
+    return start == u"ps" || start == u"gn" ? 1 : 0;
+}
+
 std::vector<Unit> letters_to_units(const std::u16string& word) {
     std::vector<Unit> units;
-    for (size_t i = 0; i < word.size();) {
+    for (size_t i = silent_prefix(word); i < word.size();) {
         if (word[i] == u'h') {
             ++i;
             continue;
@@ -230,13 +236,17 @@ bool valid_onset(const std::u16string& s) {
     return s.size() <= 1 || std::find(kOnsetClusters.begin(), kOnsetClusters.end(), s) != kOnsetClusters.end();
 }
 
-// Consonants that close a syllable inside a word ("ap-to", "ins-tar").
+// Word-initial onsets also include learned Greek clusters ("psicología", "gnomo").
+bool valid_initial_onset(const std::u16string& s) { return valid_onset(s) || s == u"ps" || s == u"gn"; }
+
+// Consonants that close a syllable inside a word ("ap-to", "ins-tar", "pers-pec-ti-va").
 bool valid_medial_coda(const std::u16string& s) {
-    return s.empty() || (s.size() == 1 && !contains(u"hñqvw", s[0])) || s == u"ns" || s == u"bs";
+    return s.empty() || (s.size() == 1 && !contains(u"hñqvw", s[0])) || s == u"ns" || s == u"bs" || s == u"rs" ||
+           s == u"ls";
 }
 
-// Consonants a Spanish word can end in ("otan", "reloj").
-bool valid_final_coda(const std::u16string& s) { return s.empty() || (s.size() == 1 && contains(u"dlnrszjxy", s[0])); }
+// A word can end in one consonant: native endings ("otan", "reloj") and loanwords ("álbum", "robot", "club").
+bool valid_final_coda(const std::u16string& s) { return s.size() <= 1; }
 
 bool valid_medial(const std::u16string& s) {
     for (size_t split = 0; split <= std::min<size_t>(2, s.size() - 1); ++split) {
@@ -248,7 +258,7 @@ bool valid_medial(const std::u16string& s) {
 // True when every consonant run fits Spanish syllables: onset, medial coda + onset, final coda.
 bool pronounceable(const std::u16string& w) {
     const auto first_vowel = std::find_if(w.begin(), w.end(), is_vowel_letter);
-    if (first_vowel == w.end() || !valid_onset(std::u16string(w.begin(), first_vowel))) return false;
+    if (first_vowel == w.end() || !valid_initial_onset(std::u16string(w.begin(), first_vowel))) return false;
     std::u16string run;
     for (auto it = first_vowel; it != w.end(); ++it) {
         if (!is_vowel_letter(*it)) {

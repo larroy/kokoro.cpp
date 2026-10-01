@@ -169,6 +169,8 @@ TEST_CASE("spanish_g2p") {
         {"El BBVA y la RAE.", "el βeβeuβeˈa i la rˈae."},
         {"HOLA MUNDO, CHILE, ESPAÑA.", "ˈola mˈundo, ʧˈile, espˈaɲa."},
         {"El ADN de IBM.", "el aðeˈene ðe iβeˈeme."},
+        {"EL ÁLBUM DEL CLUB, UN ROBOT Y LA PSICOLOGÍA EN PERSPECTIVA.",
+         "el ˈalβum del klˈub, ˈun roβˈot i la sikoloxˈia em peɾspektˈiβa."},
     };
     for (const Case& c : cases) {
         const std::string input = c.input;
