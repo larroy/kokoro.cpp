@@ -23,6 +23,8 @@ from dataclasses import dataclass
 
 import click
 
+import voice_tool
+
 ROOT = Path(__file__).resolve().parent
 ORT_DIR = ROOT / "third_party" / "onnxruntime"
 ORT_STAMP = ORT_DIR / ".archive"
@@ -108,12 +110,36 @@ CUDA_RUNTIME_LIBRARIES = {
               "libcufft.so.11", "libcudnn.so.9"),
 }
 
+
+@dataclass(frozen=True)
+class Artifact:
+    name: str  # file name in models/ (or voice name for SPANISH_VOICES)
+    url: str
+    sha256: str
+
+
 ARTIFACTS_URL = "https://github.com/larroy/kokoro.cpp/releases/download/voices_model_files"
-# file name -> sha256
-ARTIFACTS = {
-    "kokoro-v1.1-zh.onnx": "eefec708cbc7aba8e8129b5c2f7cb92e1fe7d281af1e1dd451592d9ff0714a0d",
-    "voices-v1.1-zh.bin": "e678019845e6cfe3b7c34531779396b28f509451b91e6535d5dc09bbf11a4be5",
-}
+ARTIFACTS = (
+    Artifact("kokoro-v1.1-zh.onnx", f"{ARTIFACTS_URL}/kokoro-v1.1-zh.onnx",
+             "eefec708cbc7aba8e8129b5c2f7cb92e1fe7d281af1e1dd451592d9ff0714a0d"),
+    Artifact("voices-v1.1-zh.bin", f"{ARTIFACTS_URL}/voices-v1.1-zh.bin",
+             "e678019845e6cfe3b7c34531779396b28f509451b91e6535d5dc09bbf11a4be5"),
+    Artifact("kokoro-v1.0.onnx",
+             "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx",
+             "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5"),
+)
+SPANISH_VOICES_URL = ("https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/"
+                      "1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices")
+SPANISH_VOICES = (
+    Artifact("ef_dora", f"{SPANISH_VOICES_URL}/ef_dora.bin",
+             "f66ec66bd295acb18372e37008533a9a3228483ccd294e7538d5d9294ac9a532"),
+    Artifact("em_alex", f"{SPANISH_VOICES_URL}/em_alex.bin",
+             "27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95"),
+    Artifact("em_santa", f"{SPANISH_VOICES_URL}/em_santa.bin",
+             "ad43b774e1ca24d05c6161297d8aeb770ac3d29bb95daf516727af5f7d543683"),
+)
+SPANISH_PACK_NAME = "voices-v1.0-es.bin"  # built locally from SPANISH_VOICES
+SPANISH_PACK_SHA256 = "cdaf0ecca101f3738763f6e3a13b63d46137909b8ebcf9de2be4ef2a73014c52"
 
 ORT_GIT_URL = "https://github.com/microsoft/onnxruntime.git"
 ORT_SRC_DIR = ROOT / "third_party" / "onnxruntime-src"
@@ -348,13 +374,34 @@ def find_cmake() -> str:
 
 def install_artifacts(force: bool) -> None:
     MODELS_DIR.mkdir(exist_ok=True)
-    for name, checksum in ARTIFACTS.items():
-        dest = MODELS_DIR / name
-        if not force and dest.is_file() and sha256(dest) == checksum:
+    for artifact in ARTIFACTS:
+        dest = MODELS_DIR / artifact.name
+        if not force and dest.is_file() and sha256(dest) == artifact.sha256:
             click.echo(f"{dest.relative_to(ROOT)} is up to date")
             continue
-        download(f"{ARTIFACTS_URL}/{name}", dest, checksum)
+        download(artifact.url, dest, artifact.sha256)
+    install_spanish_voices(force)
 
+
+def install_spanish_voices(force: bool) -> None:
+    """Build the Spanish voices file from the onnx-community raw float32 voices."""
+    dest = MODELS_DIR / SPANISH_PACK_NAME
+    if not force and dest.is_file() and sha256(dest) == SPANISH_PACK_SHA256:
+        click.echo(f"{dest.relative_to(ROOT)} is up to date")
+        return
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp = Path(tmp_dir)
+        for voice in SPANISH_VOICES:
+            download(voice.url, tmp / f"{voice.name}.bin", voice.sha256)
+        voices = {v.name: voice_tool.load_raw(tmp / f"{v.name}.bin") for v in SPANISH_VOICES}
+    part = dest.with_name(dest.name + ".part")
+    voice_tool.save_voices(part, voices)
+    actual = sha256(part)
+    if actual != SPANISH_PACK_SHA256:
+        part.unlink()
+        raise click.ClickException(f"Checksum mismatch for {dest.name}: expected {SPANISH_PACK_SHA256}, got {actual}")
+    part.replace(dest)
+    click.echo(f"Wrote {dest.relative_to(ROOT)}")
 
 
 def cmake_version(cmake: str) -> tuple[int, int] | None:
@@ -469,7 +516,7 @@ def cli():
 @click.option("--ort", "ort_mode", type=click.Choice(["auto", "cpu", "gpu"]), default="auto", show_default=True,
               help="ONNX Runtime package; auto uses the CUDA build when a supported NVIDIA GPU is found.")
 def configure(force, ort_mode):
-    """Download ONNX Runtime, the Kokoro model and the voices."""
+    """Download ONNX Runtime, the Kokoro models and the voices."""
     gpus = detect_gpus()
     if gpus:
         for gpu in gpus:

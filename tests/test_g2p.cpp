@@ -6,6 +6,7 @@
 
 #include "JiebaProcessor.h"
 #include "NumberNormalizer.h"
+#include "SpanishG2P.h"
 #include "Tokenizer.h"
 #include "ZHG2P.h"
 
@@ -79,6 +80,33 @@ TEST_CASE("number_conversion_english") {
     }
 }
 
+TEST_CASE("number_conversion_spanish") {
+    static const Case cases[] = {
+        {"0", "cero"},
+        {"21", "veintiuno"},
+        {"22", "veintidós"},
+        {"31", "treinta y uno"},
+        {"100", "cien"},
+        {"101", "ciento uno"},
+        {"500", "quinientos"},
+        {"1984", "mil novecientos ochenta y cuatro"},
+        {"21000", "veintiún mil"},
+        {"101000", "ciento un mil"},
+        {"1000000", "un millón"},
+        {"2500000", "dos millones quinientos mil"},
+        {"31000000", "treinta y un millones"},
+        {"-5", "menos cinco"},
+        {"3.14", "tres punto uno cuatro"},
+        {"1234567890123", "uno dos tres cuatro cinco seis siete ocho nueve cero uno dos tres"},
+        {"tengo 3 gatos", "tengo tres gatos"},
+    };
+    for (const Case& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(normalize_numbers(input, NumberLanguage::Spanish) == std::string(c.expected));
+    }
+}
+
 TEST_CASE("number_language_auto_and_forced") {
     struct NumCase {
         const char* input;
@@ -91,11 +119,54 @@ TEST_CASE("number_language_auto_and_forced") {
         {"我有3个 apples", NumberLanguage::Auto, "我有三个 apples"},
         {"IPV4地址是192.168.0.1", NumberLanguage::Auto, "IPV four地址是一九二点一六八点零点一"},
         {"I have 3 apples", NumberLanguage::Chinese, "I have 三 apples"},
+        {"I have 3 apples", NumberLanguage::Spanish, "I have tres apples"},
+        {"tengo 3 gatos", NumberLanguage::Auto, "tengo three gatos"},
     };
     for (const NumCase& c : cases) {
         const std::string input = c.input;
         CAPTURE(input);
         CHECK(normalize_numbers(input, c.language) == std::string(c.expected));
+    }
+}
+
+TEST_CASE("spanish_g2p") {
+    // Pinned after eval_bench/compare_g2p.py matched espeak-ng on eval_bench/corpus/es.txt.
+    static const Case cases[] = {
+        {"Hola mundo", "ˈola mˈundo"},
+        {"Hola, ¿cómo estás?", "ˈola, ¿kˈomo estˈas?"},
+        {"Buenos días.", "bwˈenos ðˈias."},
+        {"Muchas gracias.", "mˈuʧas ɣɾˈaθjas."},
+        {"El niño come manzanas.", "el nˈiɲo kˈome manθˈanas."},
+        {"La ciudad de Madrid.", "la θjuðˈad ðe maðɾˈid."},
+        {"Zapato, cereza y cebolla.", "θapˈato, θeɾˈeθa i θeβˈoʎa."},
+        {"El perro corre rápido por la carretera.", "el pˈero kˈore rˈapiðo poɾ la karetˈeɾa."},
+        {"Honra, alrededor, Israel.", "ˈonra, alreðeðˈoɾ, israˈel."},
+        {"Guerra, guitarra, pingüino, agua.", "ɡˈera, ɡitˈara, piŋɡuˈino, ˈaɣwa."},
+        {"Gente y jirafa.", "xˈɛnte i xiɾˈafa."},
+        {"Queso, quince, kilo.", "kˈeso, kˈinθe, kˈilo."},
+        {"Examen, taxi, xilófono.", "eksˈamen, tˈaksi, silˈofono."},
+        {"Yo voy a la playa.", "ʝˈo βˈoɪ a la plˈaʝa."},
+        {"Llueve en la calle.", "ʎuˈeβe en la kˈaʎe."},
+        {"Bebé, vaca, ambos, hablar.", "beβˈe, bˈaka, ˈambos, aβlˈaɾ."},
+        {"Cuidado con el diente.", "kwiðˈaðo kon el ðjˈɛnte."},
+        {"Aire, causa, reina, oigo.", "ˈIɾe, kˈWsa, rˈAna, ˈoɪɣo."},
+        {"Poeta, león, país, baúl.", "poˈeta, leˈon, paˈis, baˈul."},
+        {"Canción, árbol, lápiz, reloj.", "kanθjˈon, ˈaɾβol, lˈapiθ, relˈox."},
+        {"Hablar, comer, vivir, ciudad.", "aβlˈaɾ, komˈeɾ, biβˈiɾ, θjuðˈad."},
+        {"Tengo un banco en Cuenca.", "tˈɛŋɡo ˈum bˈanko en kwˈɛnka."},
+        {"Él tiene más de un coche.", "ˈel tjˈene mˈas ðe ˈun kˈoʧe."},
+        {"Hoy es lunes.", "ˈoɪ ˈes lˈunes."},
+        {"Pequeño, mañana, España.", "pekˈeɲo, maɲˈana, espˈaɲa."},
+        {"¡Qué bueno!", "¡kˈe βwˈeno!"},
+        {"Señor García, ¿dónde está el baño?", "seɲˈoɾ ɣaɾθˈia, ¿dˈonde estˈa el βˈaɲo?"},
+        {"El agua del río está fría.", "el ˈaɣwa ðel rˈio estˈa fɾˈia."},
+        {"Tengo 3 gatos y 25 perros.", "tˈɛŋɡo tɾˈes ɣˈatos i βAntiθˈinko pˈeros."},
+        {"Nací en 1984.", "naθˈi en mˈil noβeθjˈɛntos oʧˈɛnta i kwˈatɾo."},
+    };
+    for (const Case& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(spanish_to_phonemes(input, NumberLanguage::Auto) == std::string(c.expected));
     }
 }
 

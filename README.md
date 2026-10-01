@@ -26,7 +26,8 @@ uv run bootstrap.py configure
 This downloads, verifying SHA-256 checksums:
 
 - the prebuilt [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
-- the model `kokoro-v1.1-zh.onnx` and the voice pack `voices-v1.1-zh.bin` from this repository's [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) into `models/`.
+- the model `kokoro-v1.1-zh.onnx` and the voice pack `voices-v1.1-zh.bin` from this repository's [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) into `models/`;
+- the Kokoro-82M v1.0 model `kokoro-v1.0.onnx` from [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), and the Spanish voices `ef_dora`, `em_alex` and `em_santa` from [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), packed into `models/voices-v1.0-es.bin`.
 
 Files that are already present and up to date are skipped; `--force` downloads them again. The ONNX Runtime version and checksums are pinned in `bootstrap.py`. To use another ONNX Runtime installation instead, skip `configure` and pass `-DONNXRUNTIME_ROOT=/path/to/onnxruntime` to CMake.
 
@@ -71,12 +72,19 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 | `-d, --dict <dir>` | dictionary directory (default: `dict`) |
 | `-v, --voice <name>` | voice (default: `af_maple`); English voices: `af_maple`, `af_sol`, `bf_vale`; Chinese voices: `zf_*`, `zm_*` |
 | `-s, --speed <rate>` | speaking rate, > 0 (default: `1.0`) |
+| `--lang <auto\|en\|zh\|es>` | language for reading numbers (default: `auto`) |
+| `--language <auto\|es>` | text language; `auto`: Spanish for `ef_*`/`em_*` voices, else Chinese/English (default: `auto`) |
 | `-o, --output <path>` | output WAV file (default: `output.wav`) |
 | `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
 | `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
 | `--list-voices` | print the available voices |
 
 To add your own voices (blends, imported `.pt` tensors), see [docs/adding-voices.md](docs/adding-voices.md).
+
+Spanish (Castilian, espeak-ng `es` phonemes) uses the v1.0 model:
+`./build/kokoro -m models/kokoro-v1.0.onnx --voices models/voices-v1.0-es.bin -v ef_dora "Hola, ¿cómo estás?"`.
+The rule-based Spanish G2P is checked against espeak-ng with
+`uv run --group eval python eval_bench/compare_g2p.py` (needs a built `g2p_dump`).
 
 ### Example
 
@@ -186,7 +194,8 @@ uv run bootstrap.py configure
 该命令会下载以下文件并校验 SHA-256：
 
 - 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2（CPU 版），放入 `third_party/onnxruntime/`；
-- 模型 `kokoro-v1.1-zh.onnx` 和语音包 `voices-v1.1-zh.bin`，来自本仓库的 [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files)，放入 `models/`。
+- 模型 `kokoro-v1.1-zh.onnx` 和语音包 `voices-v1.1-zh.bin`，来自本仓库的 [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files)，放入 `models/`；
+- Kokoro-82M v1.0 模型 `kokoro-v1.0.onnx`（来自 [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)），以及西班牙语语音 `ef_dora`、`em_alex`、`em_santa`（来自 [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)），打包为 `models/voices-v1.0-es.bin`。
 
 已存在且校验一致的文件会被跳过；`--force` 强制重新下载。ONNX Runtime 版本和校验值固定在 `bootstrap.py` 中。如需使用其他 ONNX Runtime，可跳过 `configure`，并向 CMake 传入 `-DONNXRUNTIME_ROOT=/path/to/onnxruntime`。
 
@@ -231,6 +240,8 @@ Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` �
 | `-d, --dict <目录>` | 词典目录（默认：`dict`） |
 | `-v, --voice <名称>` | 语音（默认：`af_maple`）；英文语音：`af_maple`、`af_sol`、`bf_vale`；中文语音：`zf_*`、`zm_*` |
 | `-s, --speed <语速>` | 语速，须 > 0（默认：`1.0`） |
+| `--lang <auto\|en\|zh\|es>` | 数字朗读语言（默认：`auto`） |
+| `--language <auto\|es>` | 文本语言；`auto`：`ef_*`/`em_*` 语音用西班牙语，否则中文/英文（默认：`auto`） |
 | `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
 | `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
 | `--phonemize` | 输出 `<文本>` 的音素而不合成 |

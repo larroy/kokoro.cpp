@@ -8,6 +8,7 @@ dependencies = ["click>=8.1"]
 [dependency-groups]
 voice = ["torch>=2.4", "numpy>=1.26"]
 dev = ["pytest>=8"]
+eval = ["phonemizer-fork>=3.3", "espeakng-loader>=0.2"]
 
 [tool.uv]
 package = false

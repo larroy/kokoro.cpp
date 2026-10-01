@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <onnxruntime_cxx_api.h>
+#include "G2PLanguage.h"
 #include "NumberNormalizer.h"
 
 // Forward declarations or placeholder for dependencies
@@ -69,16 +70,25 @@ public:
      *  into the phoneme representation used by the synthesis engine.
      *
      *  \param text Input text to phonemize (UTF-8).
+     *  \param language G2P that reads the text (see language_for()).
      *  \return Phoneme string suitable for create(..., is_phonemes=true).
      */
-    std::string phonemize(const std::string& text);
+    std::string phonemize(const std::string& text, G2PLanguage language);
 
-    // How G2P reads digits in later phonemize()/create() calls.
+    // How G2P reads digits in later phonemize()/create() calls. An explicit language (English/Chinese/Spanish) wins
+    // in both G2Ps; Auto reads Spanish text's numbers in Spanish and keeps the nearest-script rule otherwise.
     void set_number_language(NumberLanguage language);
+
+    // Forces the G2P language for later create() calls by voice name; nullopt = auto (see language_for()).
+    // Number reading follows set_number_language(): an explicit number language also applies to Spanish text.
+    void set_language(std::optional<G2PLanguage> forced);
+
+    // The forced language if set; else Spanish for voices named ef_* / em_*, else ChineseEnglish. "" = no voice.
+    G2PLanguage language_for(const std::string& voice_name) const;
 
     /** \brief Synthesizes audio from text using a named voice.
      *
-     *  Text is automatically converted to phonemes internally.
+     *  Text is converted to phonemes internally, by the G2P language_for(voice_name) selects.
      *
      *  \param text Input text to synthesize (UTF-8).
      *  \param voice_name Voice identifier from voice_names().
@@ -102,6 +112,7 @@ public:
      *
      *  \param text Input text to synthesize (UTF-8).
      *  \param voice_style Reference to a 256-element float vector.
+     *  \param language G2P that reads text when is_phonemes is false.
      *  \param speed Playback speed multiplier (default 1.0).
      *  \param is_phonemes Set true if text is already a phoneme string (default false).
      *  \param trim Set true to remove silence at start/end (default true).
@@ -111,6 +122,7 @@ public:
     std::pair<std::vector<float>, int> create(
         const std::string& text,
         const std::vector<float>& voice_style,
+        G2PLanguage language,
         float speed = 1.0f,
         bool is_phonemes = false,
         bool trim = true
@@ -126,6 +138,7 @@ private:
     std::map<std::string, std::vector<float>> voices_;
     
     std::unique_ptr<Tokenizer> tokenizer_;
+    std::optional<G2PLanguage> forced_language_;  // nullopt: by voice name
     
     // Internal methods
     void create_session(const std::string& model_path, const InferenceConfig& inference);

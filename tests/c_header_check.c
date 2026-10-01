@@ -8,5 +8,7 @@ const char* kokoro_c_header_version(void) {
     (void)audio;
     (void)status;
     (void)language;
+    kokoro_language lang = KOKORO_LANGUAGE_AUTO;
+    (void)lang;
     return kokoro_version();
 }

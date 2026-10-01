@@ -125,6 +125,17 @@ def load_pt(path: Path) -> array:
     return array("f", tensor.detach().float().flatten().tolist())
 
 
+def load_raw(path: Path) -> array:
+    """Read a voice stored as ROWS x DIM little-endian float32 values (onnx-community `voices/*.bin`)."""
+    data = path.read_bytes()
+    if len(data) != STYLE_LEN * 4:
+        raise click.ClickException(f"{path}: expected {STYLE_LEN * 4} bytes ({ROWS} x {DIM} float32), got {len(data)}")
+    style = array("f", data)
+    if sys.byteorder == "big":
+        style.byteswap()
+    return style
+
+
 def store_voice(voices: dict[str, array], name: str, style: array, output: Path) -> None:
     replaced = name in voices
     voices[name] = style

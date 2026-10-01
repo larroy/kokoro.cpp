@@ -25,6 +25,7 @@ struct Options {
     std::string voice = "af_maple";
     float speed = 1.0f;
     kokoro_number_language number_language = KOKORO_NUMBERS_AUTO;  // --lang
+    kokoro_language language = KOKORO_LANGUAGE_AUTO;  // --language
     std::string output = "output.wav";
     kokoro_device device = KOKORO_DEVICE_AUTO;
     int gpu_id = 0;
@@ -38,7 +39,7 @@ struct Options {
     std::string text;
 };
 
- enum class Opt { Model, Voices, Dict, Voice, Lang, Speed, Output, Device, GpuId, Phonemes, Phonemize,
+ enum class Opt { Model, Voices, Dict, Voice, Lang, Language, Speed, Output, Device, GpuId, Phonemes, Phonemize,
                   ListVoices, Interactive, Help, Version };
 
 struct OptionSpec {
@@ -54,6 +55,7 @@ constexpr OptionSpec kOptions[] = {
     {"-d", "--dict", Opt::Dict, true},
     {"-v", "--voice", Opt::Voice, true},
     {nullptr, "--lang", Opt::Lang, true},
+    {nullptr, "--language", Opt::Language, true},
     {"-s", "--speed", Opt::Speed, true},
     {"-o", "--output", Opt::Output, true},
     {nullptr, "--device", Opt::Device, true},
@@ -86,7 +88,9 @@ void print_usage(std::FILE* out) {
         "      --voices <path>   voices file (default: models/voices-v1.1-zh.bin)\n"
         "  -d, --dict <dir>      dictionary directory (default: dict)\n"
         "  -v, --voice <name>    voice to use (default: af_maple)\n"
-        "      --lang <auto|en|zh>  language for reading numbers (default: auto)\n"
+        "      --lang <auto|en|zh|es>  language for reading numbers (default: auto)\n"
+        "      --language <auto|es>  text language; auto: Spanish for ef_*/em_* voices, else Chinese/English "
+        "(default: auto)\n"
         "  -s, --speed <rate>    speaking rate, > 0 (default: 1.0)\n"
 "  -o, --output <path>   output WAV file (default: output.wav; unused with -i)\n"
         "      --device <name>   auto, cpu or cuda (default: auto)\n"
@@ -105,11 +109,19 @@ bool usage_error(const std::string& message) {
     return false;
 }
 
-// Maps the --lang value; returns false for anything but "auto", "en" or "zh".
+// Maps the --lang value; returns false for anything but "auto", "en", "zh" or "es".
 bool parse_number_language(const std::string& value, kokoro_number_language& language) {
     if (value == "auto") { language = KOKORO_NUMBERS_AUTO; return true; }
     if (value == "en") { language = KOKORO_NUMBERS_ENGLISH; return true; }
     if (value == "zh") { language = KOKORO_NUMBERS_CHINESE; return true; }
+    if (value == "es") { language = KOKORO_NUMBERS_SPANISH; return true; }
+    return false;
+}
+
+// Maps the --language value; returns false for anything but "auto" or "es".
+bool parse_language(const std::string& value, kokoro_language& language) {
+    if (value == "auto") { language = KOKORO_LANGUAGE_AUTO; return true; }
+    if (value == "es") { language = KOKORO_LANGUAGE_SPANISH; return true; }
     return false;
 }
 
@@ -176,7 +188,12 @@ bool parse_args(const std::vector<std::string>& args, Options& opt) {
             case Opt::Voice: opt.voice = value; break;
             case Opt::Lang:
                 if (!parse_number_language(value, opt.number_language)) {
-                    return usage_error("invalid language '" + value + "' (must be auto, en or zh)");
+                    return usage_error("invalid number language '" + value + "' (must be auto, en, zh or es)");
+                }
+                break;
+            case Opt::Language:
+                if (!parse_language(value, opt.language)) {
+                    return usage_error("invalid language '" + value + "' (must be auto or es)");
                 }
                 break;
             case Opt::Output: opt.output = value; break;
@@ -293,6 +310,7 @@ int run(const Options& opt) {
     }
     const std::unique_ptr<kokoro_ctx, decltype(&kokoro_destroy)> ctx(raw_ctx, &kokoro_destroy);
     if (kokoro_set_number_language(ctx.get(), opt.number_language) != KOKORO_OK) return library_error();
+    if (kokoro_set_language(ctx.get(), opt.language) != KOKORO_OK) return library_error();
     const double init_s = elapsed_s(init_start);
     std::fprintf(stderr, "Initialized engine in %.3f s\n", init_s);
 

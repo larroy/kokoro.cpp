@@ -82,6 +82,7 @@ TEST_CASE("calls_reject_null_context") {
     CHECK(kokoro_phonemize(nullptr, "x", &phonemes) == KOKORO_ERROR_INVALID_ARGUMENT);
     CHECK(phonemes == nullptr);
     CHECK(kokoro_set_number_language(nullptr, KOKORO_NUMBERS_AUTO) == KOKORO_ERROR_INVALID_ARGUMENT);
+    CHECK(kokoro_set_language(nullptr, KOKORO_LANGUAGE_AUTO) == KOKORO_ERROR_INVALID_ARGUMENT);
 }
 
 TEST_CASE("audio_free_zeroes_struct") {

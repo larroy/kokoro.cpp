@@ -1,5 +1,6 @@
 #include "Tokenizer.h"
 #include "JiebaProcessor.h"
+#include "SpanishG2P.h"
 #include "ZHG2P.h"
 #include <iostream>
 #include <vector>
@@ -60,11 +61,11 @@ std::vector<int> Tokenizer::tokenize(const std::string& phonemes) {
     return tokens;
 }
 
-std::string Tokenizer::phonemize(const std::string& text, bool norm) {
-    auto result = (*g2p_)(text);
-    return result.first;
+std::string Tokenizer::phonemize(const std::string& text, G2PLanguage language) {
+    return language == G2PLanguage::Spanish ? spanish_to_phonemes(text, number_language_) : (*g2p_)(text).first;
 }
 
 void Tokenizer::set_number_language(NumberLanguage language) {
+    number_language_ = language;
     if (g2p_) g2p_->set_number_language(language);
 }

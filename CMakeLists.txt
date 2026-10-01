@@ -106,6 +106,7 @@ add_library(kokoro_core STATIC
     src/ToneSandhi.cpp
     src/ZHFrontend.cpp
     src/NeuralG2P.cpp
+    src/SpanishG2P.cpp
 )
 target_include_directories(kokoro_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -198,5 +199,9 @@ option(KOKORO_BUILD_TESTS "Build the kokoro tests" ${KOKORO_IS_TOP_LEVEL})
 if (KOKORO_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+option(KOKORO_BUILD_EVAL "Build the G2P evaluation tools in eval_bench/" ${KOKORO_IS_TOP_LEVEL})
+if (KOKORO_BUILD_EVAL)
+    add_subdirectory(eval_bench)
 endif()
 

@@ -192,12 +192,21 @@ std::vector<std::string> Kokoro::voice_names() const {
     return names;
 }
 
-std::string Kokoro::phonemize(const std::string& text) {
-    return tokenizer_->phonemize(text);
+std::string Kokoro::phonemize(const std::string& text, G2PLanguage language) {
+    return tokenizer_->phonemize(text, language);
 }
 
 void Kokoro::set_number_language(NumberLanguage language) {
     if (tokenizer_) tokenizer_->set_number_language(language);
+}
+
+void Kokoro::set_language(std::optional<G2PLanguage> forced) { forced_language_ = forced; }
+
+G2PLanguage Kokoro::language_for(const std::string& voice_name) const {
+    if (forced_language_) return *forced_language_;
+    const bool spanish_voice = voice_name.size() > 3 && voice_name[0] == 'e' &&
+                               (voice_name[1] == 'f' || voice_name[1] == 'm') && voice_name[2] == '_';
+    return spanish_voice ? G2PLanguage::Spanish : G2PLanguage::ChineseEnglish;
 }
 
 std::vector<std::string> Kokoro::_split_phonemes(const std::string& phonemes) {
@@ -334,13 +343,14 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
 std::pair<std::vector<float>, int> Kokoro::create(
     const std::string& text,
     const std::vector<float>& voice_style,
+    G2PLanguage language,
     float speed,
     bool is_phonemes,
     bool trim
 ) {
     std::string phonemes = text;
     if (!is_phonemes) {
-        phonemes = phonemize(text);
+        phonemes = phonemize(text, language);
     }
     
     auto batched_phonemes = _split_phonemes(phonemes);
@@ -364,5 +374,5 @@ std::pair<std::vector<float>, int> Kokoro::create(
     bool is_phonemes,
     bool trim
 ) {
-    return create(text, get_voice_style(voice_name), speed, is_phonemes, trim);
+    return create(text, get_voice_style(voice_name), language_for(voice_name), speed, is_phonemes, trim);
 }
