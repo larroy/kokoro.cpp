@@ -497,6 +497,8 @@ Como alternativa, `add_subdirectory(kokoro.cpp)` y enlaza `kokoro::kokoro`.
 
 `src/SpanishG2P.cpp` convierte el texto en fonemas con reglas (sin diccionario ni espeak-ng, que es GPL-3.0), siguiendo la convención de espeak-ng `es` con la que se entrenaron las voces: ortografía → fonemas (`θ` para `c`/`z`, `x` para `j`, `ʎ` para `ll`, `ʝ` para `y` ante vocal), diptongos y acento según las reglas ortográficas, y alófonos `β ð ɣ` y asimilación nasal entre palabras. Los números se leen en español (`25` → `veinticinco`).
 
+Las siglas en mayúsculas se leen como palabra si se pueden pronunciar así en español (`OTAN` → `ˈotan`, `ONU`, `NASA`); si no, se deletrean con los nombres de las letras, con el acento en la última (`CPP` → `θepepˈe`, `GPU` → `xepeˈu`, `DVD` → `deuβeðˈe`). En inglés, en cambio, las palabras en mayúsculas de hasta 5 letras siempre se deletrean.
+
 Se evalúa contra espeak-ng con un corpus (`eval_bench/corpus/es.txt`):
 
 ```bash

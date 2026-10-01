@@ -26,6 +26,7 @@ struct Segment {
     SegmentType type;
     std::u16string text;  // lowercased letters for Word, the symbol for Punct
     std::vector<Unit> units;
+    bool all_caps = true;  // Word: every letter was written in upper case
 };
 
 const std::u16string kKeptPunct = u";:,.!?¿¡—…\"()“”";
@@ -62,6 +63,7 @@ void push_char(std::vector<Segment>& segments, char16_t raw) {
     if (is_letter(c)) {
         if (segments.empty() || segments.back().type != SegmentType::Word) segments.push_back({SegmentType::Word, u""});
         segments.back().text += c;
+        segments.back().all_caps = segments.back().all_caps && raw != c;
     } else if (c == u'«' || c == u'»' || contains(kKeptPunct, c)) {
         const char16_t mapped = c == u'«' ? u'“' : c == u'»' ? u'”' : c;
         segments.push_back({SegmentType::Punct, std::u16string(1, mapped)});
@@ -202,13 +204,85 @@ void open_stressed_e(std::vector<Unit>& units, size_t main) {
     if (open) units[main].ipa = u"ɛ";
 }
 
+void stress_nucleus(std::vector<Unit>& units, const std::vector<Nucleus>& nuclei, size_t stressed) {
+    if (stressed >= nuclei.size()) return;
+    units[nuclei[stressed].main].stressed = true;
+    open_stressed_e(units, nuclei[stressed].main);
+}
+
 void phonemize_word(Segment& segment) {
     segment.units = letters_to_units(segment.text);
     const std::vector<Nucleus> nuclei = find_nuclei(segment.units);
-    const size_t stressed = stressed_nucleus(nuclei, segment.text);
-    if (stressed >= nuclei.size()) return;
-    segment.units[nuclei[stressed].main].stressed = true;
-    open_stressed_e(segment.units, nuclei[stressed].main);
+    stress_nucleus(segment.units, nuclei, stressed_nucleus(nuclei, segment.text));
+}
+
+// ---- acronyms ----
+
+const std::u16string kAlphabet = u"abcdefghijklmnñopqrstuvwxyzáéíóúü";
+const std::array<std::u16string, 33> kLetterNames = {
+    u"a",  u"be",   u"ce", u"de",  u"e",  u"efe", u"ge",  u"hache",    u"i",   u"jota",     u"ka",
+    u"ele", u"eme", u"ene", u"eñe", u"o",  u"pe",  u"cu",  u"erre",     u"ese", u"te",       u"u",
+    u"uve", u"uvedoble",   u"equis", u"igriega", u"zeta", u"a", u"e", u"i",  u"o", u"u", u"u"};
+const std::array<std::u16string, 14> kOnsetClusters = {u"pl", u"pr", u"bl", u"br", u"tr", u"dr", u"cl",
+                                                       u"cr", u"gl", u"gr", u"fl", u"fr", u"ch", u"ll"};
+
+bool valid_onset(const std::u16string& s) {
+    return s.size() <= 1 || std::find(kOnsetClusters.begin(), kOnsetClusters.end(), s) != kOnsetClusters.end();
+}
+
+// Consonants that close a syllable inside a word ("ap-to", "ins-tar").
+bool valid_medial_coda(const std::u16string& s) {
+    return s.empty() || (s.size() == 1 && !contains(u"hñqvw", s[0])) || s == u"ns" || s == u"bs";
+}
+
+// Consonants a Spanish word can end in ("otan", "reloj").
+bool valid_final_coda(const std::u16string& s) { return s.empty() || (s.size() == 1 && contains(u"dlnrszjxy", s[0])); }
+
+bool valid_medial(const std::u16string& s) {
+    for (size_t split = 0; split <= std::min<size_t>(2, s.size() - 1); ++split) {
+        if (valid_medial_coda(s.substr(0, split)) && valid_onset(s.substr(split))) return true;
+    }
+    return false;
+}
+
+// True when every consonant run fits Spanish syllables: onset, medial coda + onset, final coda.
+bool pronounceable(const std::u16string& w) {
+    const auto first_vowel = std::find_if(w.begin(), w.end(), is_vowel_letter);
+    if (first_vowel == w.end() || !valid_onset(std::u16string(w.begin(), first_vowel))) return false;
+    std::u16string run;
+    for (auto it = first_vowel; it != w.end(); ++it) {
+        if (!is_vowel_letter(*it)) {
+            run += *it;
+        } else if (!run.empty()) {
+            if (!valid_medial(run)) return false;
+            run.clear();
+        }
+    }
+    return valid_final_coda(run);
+}
+
+// An all-caps word is read as a word when Spanish can say it as written ("ONU", "OTAN"), and spelled out by
+// letter names otherwise, since that is shorter and easier than the letters ("CPP", "GPU", "DVD", "IBM").
+bool spelled_acronym(const Segment& segment) {
+    return segment.all_caps && segment.text.size() >= 2 && !pronounceable(segment.text);
+}
+
+// Letter names read as one word with the main stress on the last letter: "CPP" -> θepepˈe.
+void spell_word(Segment& segment) {
+    std::vector<Nucleus> last_nuclei;
+    std::u16string last_name;
+    size_t offset = 0;
+    for (const char16_t letter : segment.text) {
+        last_name = kLetterNames[kAlphabet.find(letter)];
+        std::vector<Unit> units = letters_to_units(last_name);
+        last_nuclei = find_nuclei(units);
+        offset = segment.units.size();
+        segment.units.insert(segment.units.end(), units.begin(), units.end());
+    }
+    // A one-syllable name is stressed even when it is also an unstressed word ("de", "te").
+    const size_t stressed = last_nuclei.size() == 1 ? 0 : stressed_nucleus(last_nuclei, last_name);
+    for (Nucleus& nucleus : last_nuclei) nucleus.main += offset;
+    stress_nucleus(segment.units, last_nuclei, stressed);
 }
 
 // ---- allophones ----
@@ -297,7 +371,12 @@ std::string spanish_to_phonemes(const std::string& text, NumberLanguage numbers)
     BasicStringUtil::u8tou16(normalized.c_str(), normalized.size(), wide);
     std::vector<Segment> segments = scan(wide);
     for (Segment& segment : segments) {
-        if (segment.type == SegmentType::Word) phonemize_word(segment);
+        if (segment.type != SegmentType::Word) continue;
+        if (spelled_acronym(segment)) {
+            spell_word(segment);
+        } else {
+            phonemize_word(segment);
+        }
     }
     apply_allophones(segments);
     std::u16string rendered;

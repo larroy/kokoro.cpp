@@ -1,2 +1,3 @@
 # <corpus text>\t<reason>: espeak-ng es_list irregular pronunciations our rules intentionally do not match
 Nací en 1984.	espeak-ng es_list number words join tens, y and ones into one unstressed word (oʧɛntaikwˈatɾo)
+El ADN de IBM.	espeak-ng reads unpronounceable vowel-initial acronyms as words (ˈadn, ˈibm); we spell them (aðeˈene, iβeˈeme)

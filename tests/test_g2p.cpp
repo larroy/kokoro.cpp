@@ -162,6 +162,13 @@ TEST_CASE("spanish_g2p") {
         {"El agua del río está fría.", "el ˈaɣwa ðel rˈio estˈa fɾˈia."},
         {"Tengo 3 gatos y 25 perros.", "tˈɛŋɡo tɾˈes ɣˈatos i βAntiθˈinko pˈeros."},
         {"Nací en 1984.", "naθˈi en mˈil noβeθjˈɛntos oʧˈɛnta i kwˈatɾo."},
+        {"Uso CPP y GPU.", "ˈuso θepepˈe i xepeˈu."},
+        {"La ONU y la OTAN.", "la ˈonu i la ˈotan."},
+        {"Un DVD y un PC.", "ˈun deuβeðˈe i ˈum peθˈe."},
+        {"La FIFA y la NASA.", "la fˈifa i la nˈasa."},
+        {"El BBVA y la RAE.", "el βeβeuβeˈa i la rˈae."},
+        {"HOLA MUNDO, CHILE, ESPAÑA.", "ˈola mˈundo, ʧˈile, espˈaɲa."},
+        {"El ADN de IBM.", "el aðeˈene ðe iβeˈeme."},
     };
     for (const Case& c : cases) {
         const std::string input = c.input;

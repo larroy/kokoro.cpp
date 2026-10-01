@@ -28,3 +28,10 @@ Señor García, ¿dónde está el baño?
 El agua del río está fría.
 Tengo 3 gatos y 25 perros.
 Nací en 1984.
+Uso CPP y GPU.
+La ONU y la OTAN.
+Un DVD y un PC.
+La FIFA y la NASA.
+El BBVA y la RAE.
+HOLA MUNDO, CHILE, ESPAÑA.
+El ADN de IBM.
