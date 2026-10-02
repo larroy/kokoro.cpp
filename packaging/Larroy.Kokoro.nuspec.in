@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Larroy.Kokoro</id>
+    <version>@VERSION@</version>
+    <authors>larroy</authors>
+    <owners>larroy</owners>
+    <description>Kokoro TTS (kokoro.cpp) for .NET: managed wrapper over the kokoro C API. Natives for win-x64 and win-arm64 come from the runtime packages.</description>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/larroy/kokoro.cpp</projectUrl>
+    <repository type="git" url="https://github.com/larroy/kokoro.cpp" />
+    <readme>README.md</readme>
+    <tags>kokoro tts onnxruntime native</tags>
+    <dependencies>
+      <group targetFramework="net8.0">
+@DEPENDENCIES@
+      </group>
+      <group targetFramework="net10.0">
+@DEPENDENCIES@
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="@README@" target="README.md" />
+    <file src="@BIN@\net8.0\Kokoro.Net.dll" target="lib/net8.0" />
+    <file src="@BIN@\net8.0\Kokoro.Net.xml" target="lib/net8.0" />
+    <file src="@BIN@\net10.0\Kokoro.Net.dll" target="lib/net10.0" />
+    <file src="@BIN@\net10.0\Kokoro.Net.xml" target="lib/net10.0" />
+  </files>
+</package>

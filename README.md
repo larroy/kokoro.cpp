@@ -141,6 +141,17 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 
 Alternatively, `add_subdirectory(kokoro.cpp)` and link `kokoro::kokoro`.
 
+### .NET (NuGet)
+
+`Larroy.Kokoro` wraps the C API for .NET 8 and .NET 10 (`dotnet/`); its runtime packages bring `kokoro.dll` and ONNX Runtime for win-x64 and win-arm64, and `Larroy.Kokoro.runtime.win-x64.cuda` adds the CUDA provider. See [`packaging/README.md`](packaging/README.md) for usage. To build the packages on Windows (needs VS 2022 with the x64 and ARM64 C++ tools, `nuget.exe` and the .NET SDK):
+
+```powershell
+./packaging/build-natives.ps1                   # kokoro.dll per RID -> artifacts/natives/<rid>/
+dotnet test dotnet/Kokoro.Net.sln -c Release
+./packaging/pack.ps1                            # -> artifacts/nuget/*.nupkg
+./packaging/smoke.ps1 -Framework net8.0         # end-to-end check against the local feed
+```
+
 ## English G2P
 
 English words are converted to phonemes in the following order (output uses the Kokoro/misaki English phoneme set):
@@ -165,6 +176,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/SpanishG2P.cpp/h`: rule-based Spanish G2P (espeak-ng `es` conventions).
 - `eval_bench/`: G2P evaluation against espeak-ng (`g2p_dump`, `compare_g2p.py`, corpora).
 - `tests/`: library tests (run with `ctest`); `tests/python/`: tests for the Python tools (run with `uv run pytest`).
+- `dotnet/`, `packaging/`: .NET wrapper (`Larroy.Kokoro`) and the scripts that build its NuGet packages.
 - `docs/`: guides ([adding voices](docs/adding-voices.md)).
 - `scripts/`: helper scripts for data processing.
 - `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
@@ -314,6 +326,17 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 
 也可以 `add_subdirectory(kokoro.cpp)` 后链接 `kokoro::kokoro`。
 
+### .NET (NuGet)
+
+`Larroy.Kokoro` 为 .NET 8 和 .NET 10 封装 C API（`dotnet/`）；其运行时包提供 win-x64 和 win-arm64 的 `kokoro.dll` 与 ONNX Runtime，`Larroy.Kokoro.runtime.win-x64.cuda` 额外提供 CUDA 执行提供程序。用法见 [`packaging/README.md`](packaging/README.md)。在 Windows 上构建这些包（需要带 x64 和 ARM64 C++ 工具的 VS 2022、`nuget.exe` 和 .NET SDK）：
+
+```powershell
+./packaging/build-natives.ps1                   # 按 RID 构建 kokoro.dll -> artifacts/natives/<rid>/
+dotnet test dotnet/Kokoro.Net.sln -c Release
+./packaging/pack.ps1                            # -> artifacts/nuget/*.nupkg
+./packaging/smoke.ps1 -Framework net8.0         # 基于本地源的端到端检查
+```
+
 ## 英文 G2P
 
 英文单词按以下顺序转换为音素（输出为 Kokoro/misaki 英文音素集）：
@@ -339,6 +362,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/SpanishG2P.cpp/h`: 基于规则的西班牙语 G2P（遵循 espeak-ng `es` 约定）。
 - `eval_bench/`: 与 espeak-ng 对比的 G2P 评测（`g2p_dump`、`compare_g2p.py`、语料）。
 - `tests/`: 库测试（使用 `ctest` 运行）；`tests/python/`：Python 工具的测试（使用 `uv run pytest` 运行）。
+- `dotnet/`, `packaging/`: .NET 封装（`Larroy.Kokoro`）及构建其 NuGet 包的脚本。
 - `docs/`: 使用指南（[添加语音](docs/adding-voices.md)）。
 - `scripts/`: 数据处理辅助脚本。
 - `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
@@ -493,6 +517,17 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 
 Como alternativa, `add_subdirectory(kokoro.cpp)` y enlaza `kokoro::kokoro`.
 
+### .NET (NuGet)
+
+`Larroy.Kokoro` envuelve la API de C para .NET 8 y .NET 10 (`dotnet/`); sus paquetes de runtime aportan `kokoro.dll` y ONNX Runtime para win-x64 y win-arm64, y `Larroy.Kokoro.runtime.win-x64.cuda` añade el proveedor CUDA. El uso está en [`packaging/README.md`](packaging/README.md). Para generar los paquetes en Windows (requiere VS 2022 con las herramientas de C++ x64 y ARM64, `nuget.exe` y el SDK de .NET):
+
+```powershell
+./packaging/build-natives.ps1                   # kokoro.dll por RID -> artifacts/natives/<rid>/
+dotnet test dotnet/Kokoro.Net.sln -c Release
+./packaging/pack.ps1                            # -> artifacts/nuget/*.nupkg
+./packaging/smoke.ps1 -Framework net8.0         # prueba de extremo a extremo con el feed local
+```
+
 ## G2P español
 
 `src/SpanishG2P.cpp` convierte el texto en fonemas con reglas (sin diccionario ni espeak-ng, que es GPL-3.0), siguiendo la convención de espeak-ng `es` con la que se entrenaron las voces: ortografía → fonemas (`θ` para `c`/`z`, `x` para `j`, `ʎ` para `ll`, `ʝ` para `y` ante vocal), diptongos y acento según las reglas ortográficas, y alófonos `β ð ɣ` y asimilación nasal entre palabras. Los números se leen en español (`25` → `veinticinco`).
@@ -532,6 +567,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/SpanishG2P.cpp/h`: G2P español basado en reglas (convención `es` de espeak-ng).
 - `eval_bench/`: evaluación del G2P frente a espeak-ng (`g2p_dump`, `compare_g2p.py`, corpus).
 - `tests/`: pruebas de la biblioteca (con `ctest`); `tests/python/`: pruebas de las herramientas de Python (con `uv run pytest`).
+- `dotnet/`, `packaging/`: wrapper de .NET (`Larroy.Kokoro`) y los scripts que generan sus paquetes NuGet.
 - `docs/`: guías ([añadir voces](docs/adding-voices.md)).
 - `scripts/`: scripts auxiliares de procesamiento de datos.
 - `dict/`: diccionarios del G2P (Jieba, pinyin, CMU, pesos de g2p_en).

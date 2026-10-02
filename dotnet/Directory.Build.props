@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <KokoroCMakeLists>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\CMakeLists.txt'))</KokoroCMakeLists>
+    <KokoroVersion>$([System.Text.RegularExpressions.Regex]::Match($(KokoroCMakeLists), '(?&lt;=project\(KokoroCPP VERSION )\d+\.\d+\.\d+').Value)</KokoroVersion>
+    <Version>$(KokoroVersion)</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <Target Name="KokoroCheckVersion" BeforeTargets="Build;Pack">
+    <Error Condition="'$(KokoroVersion)' == ''"
+           Text="Could not read 'project(KokoroCPP VERSION x.y.z)' from $(MSBuildThisFileDirectory)..\CMakeLists.txt" />
+  </Target>
+</Project>

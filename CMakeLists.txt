@@ -20,19 +20,19 @@ include(CMakePackageConfigHelpers)
 find_package(Threads REQUIRED)
 
 # ONNX Runtime Configuration
-# Priority 1: third_party/onnxruntime, downloaded by `uv run bootstrap.py configure`
+# Priority 1: -DONNXRUNTIME_ROOT (packaging/build-natives.ps1 passes one per RID)
+# Priority 2: third_party/onnxruntime, downloaded by `uv run bootstrap.py configure`
+# Priority 3: common system paths
 set(LOCAL_ONNX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime")
-if(EXISTS "${LOCAL_ONNX_PATH}")
+if (DEFINED ONNXRUNTIME_ROOT)
+    message(STATUS "Using ONNX Runtime from ONNXRUNTIME_ROOT: ${ONNXRUNTIME_ROOT}")
+elseif (EXISTS "${LOCAL_ONNX_PATH}")
     message(STATUS "Using local ONNX Runtime from: ${LOCAL_ONNX_PATH}")
     set(ONNXRUNTIME_ROOT "${LOCAL_ONNX_PATH}")
-# Priority 2: User defined ONNXRUNTIME_ROOT
-elseif(NOT DEFINED ONNXRUNTIME_ROOT)
-    # Priority 3: Common system paths
-    if (APPLE)
-        set(ONNXRUNTIME_ROOT "/opt/homebrew/opt/onnxruntime")
-    else()
-        set(ONNXRUNTIME_ROOT "/usr/local")
-    endif()
+elseif (APPLE)
+    set(ONNXRUNTIME_ROOT "/opt/homebrew/opt/onnxruntime")
+else()
+    set(ONNXRUNTIME_ROOT "/usr/local")
 endif()
 
 message(STATUS "Looking for ONNX Runtime in: ${ONNXRUNTIME_ROOT}")

@@ -1,0 +1,101 @@
+name: Pack
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pack:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Install nuget.exe
+        uses: NuGet/setup-nuget@v4
+
+      - name: Cache ONNX Runtime packages
+        uses: actions/cache@v6
+        with:
+          path: build/packaging/ort
+          key: ort-packaging-${{ hashFiles('bootstrap.py') }}
+
+      - name: Build natives (win-x64, win-arm64)
+        shell: pwsh
+        run: ./packaging/build-natives.ps1
+
+      - name: C API tests (c_header_check.c)
+        run: ctest --test-dir build/packaging/win-x64 --output-on-failure -R c_api
+
+      - name: .NET tests
+        run: dotnet test dotnet/Kokoro.Net.sln -c Release
+
+      - name: Pack
+        shell: pwsh
+        run: ./packaging/pack.ps1
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nuget
+          path: artifacts/nuget/*.nupkg
+          if-no-files-found: error
+
+  smoke:
+    needs: pack
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache model and voices
+        uses: actions/cache@v6
+        with:
+          path: models
+          key: kokoro-models-${{ hashFiles('bootstrap.py') }}
+          restore-keys: kokoro-models-
+          enableCrossOsArchive: true
+
+      - name: Download model and voices
+        run: uv run bootstrap.py configure --ort cpu
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: nuget
+          path: artifacts/nuget
+
+      - name: Smoke test the packages
+        shell: pwsh
+        run: ./packaging/smoke.ps1 -Framework net8.0

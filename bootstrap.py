@@ -308,21 +308,22 @@ def extract(archive: Path, dest: Path) -> None:
                 tf.extractall(dest, members)
 
 
-def install_onnxruntime(archive: OrtArchive, force: bool) -> None:
+def install_onnxruntime(archive: OrtArchive, dest: Path, force: bool) -> None:
     name = archive.name
     checksum = archive.sha256
-    if not force and ORT_STAMP.is_file() and ORT_STAMP.read_text().strip() == name:
-        click.echo(f"ONNX Runtime {ORT_VERSION} already in {ORT_DIR.relative_to(ROOT)}")
+    stamp = dest / ".archive"
+    if not force and stamp.is_file() and stamp.read_text().strip() == name:
+        click.echo(f"ONNX Runtime {ORT_VERSION} already in {dest}")
         return
-    if ORT_DIR.exists():
-        shutil.rmtree(ORT_DIR)
-    ORT_DIR.mkdir(parents=True)
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True)
     with tempfile.TemporaryDirectory() as tmp:
         archive_path = Path(tmp) / name
         download(f"{ORT_URL}/{name}", archive_path, checksum)
-        extract(archive_path, ORT_DIR)
-    ORT_STAMP.write_text(name + "\n")
-    click.echo(f"Installed ONNX Runtime {ORT_VERSION} into {ORT_DIR.relative_to(ROOT)}")
+        extract(archive_path, dest)
+    stamp.write_text(name + "\n")
+    click.echo(f"Installed ONNX Runtime {ORT_VERSION} into {dest}")
 
 def can_load(name: str) -> bool:
     try:
@@ -529,10 +530,23 @@ def configure(force, ort_mode):
     choice = choose_ort(ort_mode, platform_key(), gpus, driver, is_current_source_build())
     click.echo(choice.reason)
     if choice.archive is not None:
-        install_onnxruntime(choice.archive, force)
+        install_onnxruntime(choice.archive, ORT_DIR, force)
     if choice.archive is None or choice.archive.cuda_archs is not None:
         report_cuda_libraries()
     install_artifacts(force)
+
+
+@cli.command("fetch-ort")
+@click.option("--platform", "platform_name", type=click.Choice(["win32", "linux", "darwin"]), required=True)
+@click.option("--arch", type=click.Choice(["x64", "arm64"]), required=True)
+@click.option("--gpu", is_flag=True, help="CUDA package instead of the CPU one.")
+@click.option("--dest", type=click.Path(file_okay=False, path_type=Path), required=True,
+              help="Directory to extract into (replaced unless it already holds this archive).")
+@click.option("--force", is_flag=True, help="Download again even if DEST is up to date.")
+def fetch_ort(platform_name: str, arch: str, gpu: bool, dest: Path, force: bool) -> None:
+    """Download a pinned ONNX Runtime package into DEST, e.g. for cross builds and packaging."""
+    choice = choose_ort("gpu" if gpu else "cpu", (platform_name, arch), (), None, False)
+    install_onnxruntime(choice.archive, dest.resolve(), force)
 
 
 @cli.command()

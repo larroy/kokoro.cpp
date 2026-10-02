@@ -37,3 +37,7 @@ venv/
 *.onnx
 *.pth
 *.bin
+
+# .NET packaging (packaging/*.ps1, dotnet/)
+artifacts/
+obj/

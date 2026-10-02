@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <AssemblyName>Kokoro.Net</AssemblyName>
+    <RootNamespace>Kokoro.Net</RootNamespace>
+    <PackageId>Larroy.Kokoro</PackageId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kokoro.Net.Tests" />
+  </ItemGroup>
+
+</Project>

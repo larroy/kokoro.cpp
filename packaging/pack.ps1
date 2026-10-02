@@ -1,0 +1,101 @@
+#Requires -Version 7
+<#
+.SYNOPSIS
+Packs Larroy.Kokoro and its runtime packages from artifacts/natives/<rid>/ into artifacts/nuget/.
+#>
+param()
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'Kokoro.Packaging.psm1') -Force
+
+$root = Split-Path $PSScriptRoot -Parent
+$feed = Join-Path $root 'artifacts/nuget'
+$nuspecDir = Join-Path $root 'artifacts/obj/nuspec'
+$readme = Join-Path $PSScriptRoot 'README.md'
+$licenseFiles = @('licenses/onnxruntime/LICENSE', 'licenses/onnxruntime/ThirdPartyNotices.txt')
+
+function Reset-Directory([string]$Path) {
+    if (Test-Path $Path) { Remove-Item $Path -Recurse -Force }
+    New-Item -ItemType Directory -Path $Path | Out-Null
+}
+
+function Get-NativeSource([hashtable]$Row, [string]$RelativePath) {
+    $path = [IO.Path]::GetFullPath((Join-Path $root "artifacts/natives/$($Row.Rid)/$RelativePath"))
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing native file: $path" }
+    $path
+}
+
+function Assert-NativesStaged([object[]]$Rows) {
+    foreach ($row in $Rows) {
+        foreach ($file in @($row.Packages.Files) + $licenseFiles) { Get-NativeSource $row $file | Out-Null }
+    }
+}
+
+function Get-FileEntries([hashtable]$Row, [hashtable]$Package) {
+    # Full file targets: NuGet mis-names extensionless files such as LICENSE given a directory target.
+    $natives = $Package.Files | ForEach-Object {
+        "    <file src=`"$(Get-NativeSource $Row $_)`" target=`"runtimes/$($Row.Rid)/native/$_`" />"
+    }
+    $licenses = $licenseFiles | ForEach-Object {
+        "    <file src=`"$(Get-NativeSource $Row $_)`" target=`"$_`" />"
+    }
+    (@($natives) + @($licenses)) -join "`n"
+}
+
+function Invoke-NuspecPack([string]$Nuspec) {
+    Invoke-Checked nuget @('pack', $Nuspec, '-OutputDirectory', $feed, '-NonInteractive')
+}
+
+function New-RuntimePackage([hashtable]$Row, [hashtable]$Package, [string]$Version) {
+    $id = Get-RuntimePackageId $Row $Package
+    $nuspec = Join-Path $nuspecDir "$id.nuspec"
+    $tokens = @{
+        ID = $id; VERSION = $Version; DESCRIPTION = $Package.Description; README = $readme
+        FILES = Get-FileEntries $Row $Package
+    }
+    New-Nuspec (Join-Path $PSScriptRoot 'runtime.nuspec.in') $tokens $nuspec
+    Invoke-NuspecPack $nuspec
+}
+
+function Get-BasePackageIds([object[]]$Rows) {
+    foreach ($row in $Rows) {
+        $row.Packages | Where-Object { $_.Suffix -eq '' } | ForEach-Object { Get-RuntimePackageId $row $_ }
+    }
+}
+
+function New-WrapperPackage([object[]]$Rows, [string]$Version) {
+    $dependencies = (Get-BasePackageIds $Rows | ForEach-Object {
+            "        <dependency id=`"$_`" version=`"[$Version]`" />"
+        }) -join "`n"
+    $nuspec = Join-Path $nuspecDir 'Larroy.Kokoro.nuspec'
+    $tokens = @{
+        VERSION = $Version; README = $readme; DEPENDENCIES = $dependencies
+        BIN = Join-Path $root 'dotnet/src/Kokoro.Net/bin/Release'
+    }
+    New-Nuspec (Join-Path $PSScriptRoot 'Larroy.Kokoro.nuspec.in') $tokens $nuspec
+    $project = Join-Path $root 'dotnet/src/Kokoro.Net/Kokoro.Net.csproj'
+    Invoke-Checked dotnet @('pack', $project, '-c', 'Release', '-o', $feed, "-p:NuspecFile=$nuspec")
+}
+
+function Assert-PackageSet([object[]]$Rows, [string]$Version) {
+    $runtimeIds = foreach ($row in $Rows) { $row.Packages | ForEach-Object { Get-RuntimePackageId $row $_ } }
+    $expected = (@('Larroy.Kokoro') + @($runtimeIds) | ForEach-Object { "$_.$Version.nupkg" } | Sort-Object) -join ', '
+    $actual = (Get-ChildItem $feed -Filter '*.nupkg' | ForEach-Object Name | Sort-Object) -join ', '
+    if ($actual -ne $expected) { throw "Unexpected package set: $actual (expected $expected)" }
+    Write-Host "Packed $actual"
+}
+
+if (-not (Get-Command nuget -ErrorAction SilentlyContinue)) {
+    throw 'nuget.exe not found on PATH; install it with `winget install Microsoft.NuGet` (CI: NuGet/setup-nuget)'
+}
+$version = Get-KokoroVersion
+$rows = Get-KokoroRids
+Reset-Directory $feed
+Reset-Directory $nuspecDir
+Assert-NativesStaged $rows
+foreach ($row in $rows) {
+    foreach ($package in $row.Packages) { New-RuntimePackage $row $package $version }
+}
+New-WrapperPackage $rows $version
+Assert-PackageSet $rows $version
