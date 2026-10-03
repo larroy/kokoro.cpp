@@ -1,0 +1,14 @@
+<Project>
+  <!-- Microsoft.ML.OnnxRuntime (via Larroy.Kokoro.runtime.win-x64) and Microsoft.ML.OnnxRuntime.Gpu.Windows both
+       ship runtimes/win-x64/native/onnxruntime.dll and onnxruntime_providers_shared.dll. At equal file versions the
+       SDK keeps the package id that sorts first, the CPU build, which has no CUDA provider. Rank the CUDA build
+       first. ResolveTargetingPackAssets overwrites PackageConflictPreferredPackages, so prepend after it. -->
+  <Target Name="LarroyKokoroPreferOnnxRuntimeGpu" DependsOnTargets="ResolveTargetingPackAssets"
+          BeforeTargets="_HandlePackageFileConflicts">
+    <PropertyGroup>
+      <PackageConflictPreferredPackages>
+        Microsoft.ML.OnnxRuntime.Gpu.Windows;$(PackageConflictPreferredPackages)
+      </PackageConflictPreferredPackages>
+    </PropertyGroup>
+  </Target>
+</Project>

@@ -32,7 +32,6 @@ function Get-BuildDir([hashtable]$Row) {
 function Invoke-OrtFetch([hashtable]$Row) {
     $fetchArgs = @('run', 'bootstrap.py', 'fetch-ort', '--platform', $Row.OrtPlatform, '--arch', $Row.OrtArch,
         '--dest', "build/packaging/ort/$($Row.Rid)")
-    if ($Row.OrtGpu) { $fetchArgs += '--gpu' }
     Push-Location $root
     try { Invoke-Checked uv $fetchArgs } finally { Pop-Location }
 }
@@ -51,7 +50,7 @@ function Invoke-NativeBuild([hashtable]$Row) {
 }
 
 function Assert-NativeMachine([hashtable]$Row) {
-    foreach ($file in 'kokoro.dll', 'onnxruntime.dll') {
+    foreach ($file in $Row.Packages.Files) {
         $machine = Get-PeMachine (Join-Path (Get-BuildDir $Row) $file)
         if ($machine -ne $Row.PeMachine) {
             throw ('{0} is machine 0x{1:X}, {2} needs 0x{3:X}' -f $file, $machine, $Row.Rid, $Row.PeMachine)
@@ -66,13 +65,9 @@ function Copy-Checked([string]$Source, [string]$Destination) {
 
 function Copy-StagedNatives([hashtable]$Row) {
     $stage = Join-Path $root "artifacts/natives/$($Row.Rid)"
-    $licenses = Join-Path $stage 'licenses/onnxruntime'
     if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-    New-Item -ItemType Directory -Path $licenses | Out-Null
+    New-Item -ItemType Directory -Path $stage | Out-Null
     foreach ($file in $Row.Packages.Files) { Copy-Checked (Join-Path (Get-BuildDir $Row) $file) $stage }
-    foreach ($file in 'LICENSE', 'ThirdPartyNotices.txt') {
-        Copy-Checked (Join-Path (Get-OrtDir $Row) $file) $licenses
-    }
     Write-Host "Staged $($Row.Rid) natives in $stage"
 }
 

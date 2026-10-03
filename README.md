@@ -143,7 +143,7 @@ Alternatively, `add_subdirectory(kokoro.cpp)` and link `kokoro::kokoro`.
 
 ### .NET (NuGet)
 
-`Larroy.Kokoro` wraps the C API for .NET 8 and .NET 10 (`dotnet/`); its runtime packages bring `kokoro.dll` and ONNX Runtime for win-x64 and win-arm64, and `Larroy.Kokoro.runtime.win-x64.cuda` adds the CUDA provider. See [`packaging/README.md`](packaging/README.md) for usage. To build the packages on Windows (needs VS 2022 with the x64 and ARM64 C++ tools, `nuget.exe` and the .NET SDK):
+`Larroy.Kokoro` wraps the C API for .NET 8 and .NET 10 (`dotnet/`); its runtime packages bring `kokoro.dll` for win-x64 and win-arm64 and take ONNX Runtime from the `Microsoft.ML.OnnxRuntime` package, and `Larroy.Kokoro.runtime.win-x64.cuda` adds CUDA through `Microsoft.ML.OnnxRuntime.Gpu.Windows`. See [`packaging/README.md`](packaging/README.md) for usage. To build the packages on Windows (needs VS 2022 with the x64 and ARM64 C++ tools, `nuget.exe` and the .NET SDK):
 
 ```powershell
 ./packaging/build-natives.ps1                   # kokoro.dll per RID -> artifacts/natives/<rid>/
@@ -328,7 +328,7 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 
 ### .NET (NuGet)
 
-`Larroy.Kokoro` 为 .NET 8 和 .NET 10 封装 C API（`dotnet/`）；其运行时包提供 win-x64 和 win-arm64 的 `kokoro.dll` 与 ONNX Runtime，`Larroy.Kokoro.runtime.win-x64.cuda` 额外提供 CUDA 执行提供程序。用法见 [`packaging/README.md`](packaging/README.md)。在 Windows 上构建这些包（需要带 x64 和 ARM64 C++ 工具的 VS 2022、`nuget.exe` 和 .NET SDK）：
+`Larroy.Kokoro` 为 .NET 8 和 .NET 10 封装 C API（`dotnet/`）；其运行时包提供 win-x64 和 win-arm64 的 `kokoro.dll`，ONNX Runtime 来自 `Microsoft.ML.OnnxRuntime` 包，`Larroy.Kokoro.runtime.win-x64.cuda` 通过 `Microsoft.ML.OnnxRuntime.Gpu.Windows` 提供 CUDA 支持。用法见 [`packaging/README.md`](packaging/README.md)。在 Windows 上构建这些包（需要带 x64 和 ARM64 C++ 工具的 VS 2022、`nuget.exe` 和 .NET SDK）：
 
 ```powershell
 ./packaging/build-natives.ps1                   # 按 RID 构建 kokoro.dll -> artifacts/natives/<rid>/
@@ -519,7 +519,7 @@ Como alternativa, `add_subdirectory(kokoro.cpp)` y enlaza `kokoro::kokoro`.
 
 ### .NET (NuGet)
 
-`Larroy.Kokoro` envuelve la API de C para .NET 8 y .NET 10 (`dotnet/`); sus paquetes de runtime aportan `kokoro.dll` y ONNX Runtime para win-x64 y win-arm64, y `Larroy.Kokoro.runtime.win-x64.cuda` añade el proveedor CUDA. El uso está en [`packaging/README.md`](packaging/README.md). Para generar los paquetes en Windows (requiere VS 2022 con las herramientas de C++ x64 y ARM64, `nuget.exe` y el SDK de .NET):
+`Larroy.Kokoro` envuelve la API de C para .NET 8 y .NET 10 (`dotnet/`); sus paquetes de runtime aportan `kokoro.dll` para win-x64 y win-arm64 y toman ONNX Runtime del paquete `Microsoft.ML.OnnxRuntime`, y `Larroy.Kokoro.runtime.win-x64.cuda` añade CUDA mediante `Microsoft.ML.OnnxRuntime.Gpu.Windows`. El uso está en [`packaging/README.md`](packaging/README.md). Para generar los paquetes en Windows (requiere VS 2022 con las herramientas de C++ x64 y ARM64, `nuget.exe` y el SDK de .NET):
 
 ```powershell
 ./packaging/build-natives.ps1                   # kokoro.dll por RID -> artifacts/natives/<rid>/

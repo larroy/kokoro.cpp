@@ -2,6 +2,8 @@
   <PropertyGroup>
     <KokoroCMakeLists>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\CMakeLists.txt'))</KokoroCMakeLists>
     <KokoroVersion>$([System.Text.RegularExpressions.Regex]::Match($(KokoroCMakeLists), '(?&lt;=project\(KokoroCPP VERSION )\d+\.\d+\.\d+').Value)</KokoroVersion>
+    <KokoroBootstrap>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)..\bootstrap.py'))</KokoroBootstrap>
+    <KokoroOrtVersion>$([System.Text.RegularExpressions.Regex]::Match($(KokoroBootstrap), '(?&lt;=\nORT_VERSION = ")\d+\.\d+\.\d+').Value)</KokoroOrtVersion>
     <Version>$(KokoroVersion)</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Nullable>enable</Nullable>
@@ -11,5 +13,7 @@
   <Target Name="KokoroCheckVersion" BeforeTargets="Build;Pack">
     <Error Condition="'$(KokoroVersion)' == ''"
            Text="Could not read 'project(KokoroCPP VERSION x.y.z)' from $(MSBuildThisFileDirectory)..\CMakeLists.txt" />
+    <Error Condition="'$(KokoroOrtVersion)' == ''"
+           Text="Could not read 'ORT_VERSION = &quot;x.y.z&quot;' from $(MSBuildThisFileDirectory)..\bootstrap.py" />
   </Target>
 </Project>

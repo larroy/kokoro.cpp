@@ -9,8 +9,10 @@ model on ONNX Runtime.
 dotnet add package Larroy.Kokoro
 ```
 
-The native `kokoro.dll` and ONNX Runtime for win-x64 and win-arm64 arrive automatically through the
-`Larroy.Kokoro.runtime.win-x64` and `Larroy.Kokoro.runtime.win-arm64` packages.
+`kokoro.dll` for win-x64 and win-arm64 arrives through the `Larroy.Kokoro.runtime.win-x64` and
+`Larroy.Kokoro.runtime.win-arm64` packages. ONNX Runtime is not bundled: those packages depend on
+`Microsoft.ML.OnnxRuntime` 1.23.2 or newer, so an app that also references `Microsoft.ML.OnnxRuntime` gets one
+`onnxruntime.dll`, the highest version requested, and kokoro uses it.
 
 ## Usage
 
@@ -38,13 +40,17 @@ threads at the same time.
 
 ## CUDA (win-x64)
 
-- Add `Larroy.Kokoro.runtime.win-x64.cuda`; `KokoroDevice.Auto` then uses CUDA.
+- Add `Larroy.Kokoro.runtime.win-x64.cuda`; `KokoroDevice.Auto` then uses CUDA. It brings
+  `Microsoft.ML.OnnxRuntime.Gpu.Windows` and makes its CUDA build of `onnxruntime.dll` take precedence over the CPU
+  build from `Microsoft.ML.OnnxRuntime`.
+- If the app references a newer `Microsoft.ML.OnnxRuntime`, also reference `Microsoft.ML.OnnxRuntime.Gpu.Windows` at
+  the same version; otherwise the newer CPU `onnxruntime.dll` wins and CUDA is unavailable.
 - The CUDA 12 / cuDNN 9 runtime DLLs must be on `PATH`: `cudart64_12.dll`, `cublas64_12.dll`, `cublasLt64_12.dll`,
   `curand64_10.dll`, `cufft64_11.dll`, `cudnn64_9.dll`.
 - Needs an NVIDIA driver supporting CUDA 12.8 or newer. The provider contains code for sm 7.5, 8.6 and 8.9; newer
   GPUs run through PTX 9.0.
-- Without the add-on, `KokoroDevice.Auto` prints a one-line fallback notice to stderr and runs on the CPU. Use
-  `KokoroDevice.Cpu` to skip the CUDA probe.
+- Without the add-on `onnxruntime.dll` is the CPU build: `KokoroDevice.Auto` runs on the CPU and `KokoroDevice.Cuda`
+  fails.
 
 ## VC++ runtime (required)
 

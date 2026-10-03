@@ -13,7 +13,6 @@ $root = Split-Path $PSScriptRoot -Parent
 $feed = Join-Path $root 'artifacts/nuget'
 $nuspecDir = Join-Path $root 'artifacts/obj/nuspec'
 $readme = Join-Path $PSScriptRoot 'README.md'
-$licenseFiles = @('licenses/onnxruntime/LICENSE', 'licenses/onnxruntime/ThirdPartyNotices.txt')
 
 function Reset-Directory([string]$Path) {
     if (Test-Path $Path) { Remove-Item $Path -Recurse -Force }
@@ -28,31 +27,39 @@ function Get-NativeSource([hashtable]$Row, [string]$RelativePath) {
 
 function Assert-NativesStaged([object[]]$Rows) {
     foreach ($row in $Rows) {
-        foreach ($file in @($row.Packages.Files) + $licenseFiles) { Get-NativeSource $row $file | Out-Null }
+        foreach ($file in @($row.Packages.Files)) { Get-NativeSource $row $file | Out-Null }
     }
 }
 
-function Get-FileEntries([hashtable]$Row, [hashtable]$Package) {
-    # Full file targets: NuGet mis-names extensionless files such as LICENSE given a directory target.
-    $natives = $Package.Files | ForEach-Object {
-        "    <file src=`"$(Get-NativeSource $Row $_)`" target=`"runtimes/$($Row.Rid)/native/$_`" />"
-    }
-    $licenses = $licenseFiles | ForEach-Object {
-        "    <file src=`"$(Get-NativeSource $Row $_)`" target=`"$_`" />"
-    }
-    (@($natives) + @($licenses)) -join "`n"
+function Get-BuildTransitiveEntries([hashtable]$Package, [string]$Id) {
+    if (-not $Package.BuildTransitive) { return }
+    $src = Join-Path $PSScriptRoot $Package.BuildTransitive
+    if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { throw "Missing build file: $src" }
+    "    <file src=`"$src`" target=`"buildTransitive/$Id.targets`" />"
+}
+
+function Get-FileEntries([hashtable]$Row, [hashtable]$Package, [string]$Id) {
+    $natives = @($Package.Files | ForEach-Object {
+            "    <file src=`"$(Get-NativeSource $Row $_)`" target=`"runtimes/$($Row.Rid)/native/$_`" />"
+        })
+    (@($natives) + @(Get-BuildTransitiveEntries $Package $Id)) -join "`n"
+}
+
+function Get-DependencyEntries([hashtable]$Package, [string]$OrtVersion) {
+    # A bare version is an inclusive minimum, so NuGet unifies with the app's own, newer ONNX Runtime.
+    ($Package.Dependencies | ForEach-Object { "      <dependency id=`"$_`" version=`"$OrtVersion`" />" }) -join "`n"
 }
 
 function Invoke-NuspecPack([string]$Nuspec) {
     Invoke-Checked nuget @('pack', $Nuspec, '-OutputDirectory', $feed, '-NonInteractive')
 }
 
-function New-RuntimePackage([hashtable]$Row, [hashtable]$Package, [string]$Version) {
+function New-RuntimePackage([hashtable]$Row, [hashtable]$Package, [string]$Version, [string]$OrtVersion) {
     $id = Get-RuntimePackageId $Row $Package
     $nuspec = Join-Path $nuspecDir "$id.nuspec"
     $tokens = @{
         ID = $id; VERSION = $Version; DESCRIPTION = $Package.Description; README = $readme
-        FILES = Get-FileEntries $Row $Package
+        DEPENDENCIES = Get-DependencyEntries $Package $OrtVersion; FILES = Get-FileEntries $Row $Package $id
     }
     New-Nuspec (Join-Path $PSScriptRoot 'runtime.nuspec.in') $tokens $nuspec
     Invoke-NuspecPack $nuspec
@@ -90,12 +97,13 @@ if (-not (Get-Command nuget -ErrorAction SilentlyContinue)) {
     throw 'nuget.exe not found on PATH; install it with `winget install Microsoft.NuGet` (CI: NuGet/setup-nuget)'
 }
 $version = Get-KokoroVersion
+$ortVersion = Get-OrtVersion
 $rows = Get-KokoroRids
 Reset-Directory $feed
 Reset-Directory $nuspecDir
 Assert-NativesStaged $rows
 foreach ($row in $rows) {
-    foreach ($package in $row.Packages) { New-RuntimePackage $row $package $version }
+    foreach ($package in $row.Packages) { New-RuntimePackage $row $package $version $ortVersion }
 }
 New-WrapperPackage $rows $version
 Assert-PackageSet $rows $version

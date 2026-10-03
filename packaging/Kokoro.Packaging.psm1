@@ -13,6 +13,13 @@ function Get-KokoroVersion {
     $match.Groups[1].Value
 }
 
+function Get-OrtVersion {
+    $bootstrap = Get-Content -Raw (Join-Path (Get-RepoRoot) 'bootstrap.py')
+    $match = [regex]::Match($bootstrap, '(?m)^ORT_VERSION = "(\d+\.\d+\.\d+)"')
+    if (-not $match.Success) { throw 'ORT_VERSION = "x.y.z" not found in bootstrap.py' }
+    $match.Groups[1].Value
+}
+
 function Get-KokoroRids {
     (Import-PowerShellDataFile (Join-Path $PSScriptRoot 'rids.psd1')).Rows
 }
@@ -91,5 +98,5 @@ function New-Nuspec([string]$Template, [hashtable]$Tokens, [string]$Destination)
     [IO.File]::WriteAllText($Destination, $content, [Text.UTF8Encoding]::new($false))
 }
 
-Export-ModuleMember -Function Get-RepoRoot, Get-KokoroVersion, Get-KokoroRids, Get-RuntimePackageId, Invoke-Checked,
-    Get-PeMachine, Invoke-InVcEnvironment, New-Nuspec
+Export-ModuleMember -Function Get-RepoRoot, Get-KokoroVersion, Get-OrtVersion, Get-KokoroRids, Get-RuntimePackageId,
+    Invoke-Checked, Get-PeMachine, Invoke-InVcEnvironment, New-Nuspec

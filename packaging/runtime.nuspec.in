@@ -11,6 +11,9 @@
     <repository type="git" url="https://github.com/larroy/kokoro.cpp" />
     <readme>README.md</readme>
     <tags>kokoro tts onnxruntime native</tags>
+    <dependencies>
+@DEPENDENCIES@
+    </dependencies>
   </metadata>
   <files>
     <file src="@README@" target="README.md" />
