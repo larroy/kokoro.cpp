@@ -25,7 +25,7 @@ uv run bootstrap.py configure
 
 This downloads, verifying SHA-256 checksums:
 
-- the prebuilt [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
+- the prebuilt [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU; the CUDA build on supported NVIDIA GPUs, see below) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
 - the model `kokoro-v1.1-zh.onnx` and the voice pack `voices-v1.1-zh.bin` from this repository's [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) into `models/`;
 - the Kokoro-82M v1.0 model `kokoro-v1.0.onnx` from [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), and the Spanish voices `ef_dora`, `em_alex` and `em_santa` from [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), packed into `models/voices-v1.0-es.bin`.
 
@@ -45,6 +45,18 @@ cmake --build build --config Release --parallel
 ```
 
 This produces the shared library `kokoro` (`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`) and the `kokoro` command-line tool. `libkokoro` links against the ONNX Runtime shared library. On Linux/macOS the build tree finds it through the rpath; installed copies need it findable at runtime. On Windows `onnxruntime.dll` is copied next to `kokoro.dll` (and installed with it).
+
+### CUDA (experimental)
+
+CUDA support is experimental. `uv run bootstrap.py configure` uses the prebuilt CUDA build of ONNX Runtime when it detects a supported NVIDIA GPU (Windows x64: sm 7.5, 8.6, 8.9 plus PTX 9.0; Linux x64: sm 6.0, 7.0, 7.5, 8.0 plus PTX 9.0) and the NVIDIA driver supports CUDA 12.8 or newer; pass `--ort cpu` or `--ort gpu` to force a package. For other GPUs, build ONNX Runtime with CUDA from source:
+
+```bash
+uv run bootstrap.py build-ort   # needs CMake 3.28+, git, a CUDA 12 toolkit and cuDNN 9 for CUDA 12
+```
+
+`build-ort` locates the CUDA toolkit through the `CUDA_HOME` or `CUDA_PATH` environment variable (the CUDA installer sets `CUDA_PATH`, e.g. `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9` on Windows), or through `nvcc` in `PATH`, or in the standard install locations (`C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.*`, `/usr/local/cuda`); `--cuda-home` points at an explicit toolkit. cuDNN is located through `CUDNN_HOME` or `CUDNN_PATH` (`--cudnn-home`; use the archive from https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/, not the installer layout). The result replaces the prebuilt package in `third_party/onnxruntime/`.
+
+At runtime the CUDA 12 and cuDNN 9 libraries must be loadable: on `PATH` on Windows (`cudart64_12.dll`, `cublas64_12.dll`, `cublasLt64_12.dll`, `curand64_10.dll`, `cufft64_11.dll`, `cudnn64_9.dll`), on `LD_LIBRARY_PATH` on Linux (`libcudart.so.12`, `libcublas.so.12`, `libcublasLt.so.12`, `libcurand.so.10`, `libcufft.so.11`, `libcudnn.so.9`); if they are missing, kokoro prints a warning and runs on the CPU. Select the inference device with `--device auto|cpu|cuda` and `--gpu-id`; with `auto` a CUDA initialization failure falls back to the CPU, with `cuda` it is an error.
 
 ### Tests
 
@@ -213,7 +225,7 @@ uv run bootstrap.py configure
 
 该命令会下载以下文件并校验 SHA-256：
 
-- 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2（CPU 版），放入 `third_party/onnxruntime/`；
+- 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2（CPU 版；受支持的 NVIDIA GPU 上为 CUDA 版，见下文），放入 `third_party/onnxruntime/`；
 - 模型 `kokoro-v1.1-zh.onnx` 和语音包 `voices-v1.1-zh.bin`，来自本仓库的 [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files)，放入 `models/`；
 - Kokoro-82M v1.0 模型 `kokoro-v1.0.onnx`（来自 [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)），以及西班牙语语音 `ef_dora`、`em_alex`、`em_santa`（来自 [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)），打包为 `models/voices-v1.0-es.bin`。
 
@@ -233,6 +245,18 @@ cmake --build build --config Release --parallel
 ```
 
 编译产物为共享库 `kokoro`（`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`）以及 `kokoro` 命令行工具。`libkokoro` 链接 ONNX Runtime 共享库：Linux/macOS 下构建目录中通过 rpath 找到它，安装后运行时需能找到它；Windows 下 `onnxruntime.dll` 会被复制到 `kokoro.dll` 旁边（并随之安装）。
+
+### CUDA（实验性）
+
+CUDA 支持是**实验性**的。检测到受支持的 NVIDIA GPU（Windows x64：sm 7.5、8.6、8.9 加 PTX 9.0；Linux x64：sm 6.0、7.0、7.5、8.0 加 PTX 9.0）且驱动支持 CUDA 12.8 或更新版本时，`uv run bootstrap.py configure` 会使用预编译的 CUDA 版 ONNX Runtime；传入 `--ort cpu` 或 `--ort gpu` 可强制选择。其他 GPU 请从源码构建带 CUDA 的 ONNX Runtime：
+
+```bash
+uv run bootstrap.py build-ort   # 需要 CMake 3.28+、git、CUDA 12 工具包和 CUDA 12 版 cuDNN 9
+```
+
+`build-ort` 通过 `CUDA_HOME` 或 `CUDA_PATH` 环境变量定位 CUDA 工具包（CUDA 安装器会设置 `CUDA_PATH`，如 Windows 上的 `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9`），也使用 `PATH` 中的 `nvcc`，最后回退到标准安装位置（`C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.*`、`/usr/local/cuda`）；可用 `--cuda-home` 显式指定。cuDNN 通过 `CUDNN_HOME` 或 `CUDNN_PATH` 定位（`--cudnn-home`；请使用 https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/ 的压缩包，而非安装器布局）。构建结果会替换 `third_party/onnxruntime/` 中的预编译包。
+
+运行时，CUDA 12 和 cuDNN 9 的库必须能被加载：Windows 上位于 `PATH`（`cudart64_12.dll`、`cublas64_12.dll`、`cublasLt64_12.dll`、`curand64_10.dll`、`cufft64_11.dll`、`cudnn64_9.dll`），Linux 上位于 `LD_LIBRARY_PATH`（`libcudart.so.12`、`libcublas.so.12`、`libcublasLt.so.12`、`libcurand.so.10`、`libcufft.so.11`、`libcudnn.so.9`）；缺失时 kokoro 会打印警告并改用 CPU。用 `--device auto|cpu|cuda` 和 `--gpu-id` 选择推理设备；`auto` 在 CUDA 初始化失败时回退到 CPU，`cuda` 则报错。
 
 ### 测试
 
@@ -399,7 +423,7 @@ uv run bootstrap.py configure
 
 Descarga, verificando las sumas SHA-256:
 
-- el [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 precompilado (CPU) para la plataforma actual (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) en `third_party/onnxruntime/`;
+- el [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 precompilado (CPU; la build CUDA en GPUs NVIDIA compatibles, ver más abajo) para la plataforma actual (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) en `third_party/onnxruntime/`;
 - el modelo `kokoro-v1.1-zh.onnx` y el paquete de voces `voices-v1.1-zh.bin` del [release `voices_model_files`](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) de este repositorio en `models/`;
 - el modelo Kokoro-82M v1.0 `kokoro-v1.0.onnx` de [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), y las voces españolas `ef_dora`, `em_alex` y `em_santa` de [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), empaquetadas en `models/voices-v1.0-es.bin`.
 
@@ -419,6 +443,18 @@ cmake --build build --config Release --parallel
 ```
 
 Genera la biblioteca compartida `kokoro` (`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`) y la herramienta de línea de comandos `kokoro`. `libkokoro` enlaza con la biblioteca compartida de ONNX Runtime. En Linux/macOS el árbol de compilación la encuentra mediante el rpath; las copias instaladas necesitan poder encontrarla en tiempo de ejecución. En Windows, `onnxruntime.dll` se copia junto a `kokoro.dll` (y se instala con ella).
+
+### CUDA (experimental)
+
+El soporte de CUDA es **experimental**. `uv run bootstrap.py configure` usa la build CUDA precompilada de ONNX Runtime al detectar una GPU NVIDIA compatible (Windows x64: sm 7.5, 8.6 y 8.9 más PTX 9.0; Linux x64: sm 6.0, 7.0, 7.5 y 8.0 más PTX 9.0) y un driver que soporte CUDA 12.8 o posterior; pasa `--ort cpu` o `--ort gpu` para forzar la elección. Para otras GPU, compila ONNX Runtime con CUDA desde el código fuente:
+
+```bash
+uv run bootstrap.py build-ort   # requiere CMake 3.28+, git, un toolkit CUDA 12 y cuDNN 9 para CUDA 12
+```
+
+`build-ort` localiza el toolkit CUDA con las variables de entorno `CUDA_HOME` o `CUDA_PATH` (el instalador de CUDA define `CUDA_PATH`, p. ej. `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9` en Windows), con `nvcc` en el `PATH`, o en las ubicaciones estándar (`C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.*`, `/usr/local/cuda`); `--cuda-home` lo indica explícitamente. cuDNN se localiza con `CUDNN_HOME` o `CUDNN_PATH` (`--cudnn-home`; usa el archivo de https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/, no el del instalador). El resultado sustituye al paquete precompilado en `third_party/onnxruntime/`.
+
+En ejecución, las bibliotecas de CUDA 12 y cuDNN 9 deben poder cargarse: en el `PATH` en Windows (`cudart64_12.dll`, `cublas64_12.dll`, `cublasLt64_12.dll`, `curand64_10.dll`, `cufft64_11.dll`, `cudnn64_9.dll`), en `LD_LIBRARY_PATH` en Linux (`libcudart.so.12`, `libcublas.so.12`, `libcublasLt.so.12`, `libcurand.so.10`, `libcufft.so.11`, `libcudnn.so.9`); si faltan, kokoro imprime un aviso y usa la CPU. Elige el dispositivo con `--device auto|cpu|cuda` y `--gpu-id`; con `auto`, un fallo de inicialización de CUDA hace que se use la CPU; con `cuda`, es un error.
 
 ### Pruebas
 
