@@ -164,6 +164,13 @@ dotnet test dotnet/Kokoro.Net.sln -c Release
 ./packaging/smoke.ps1 -Framework net8.0         # end-to-end check against the local feed
 ```
 
+Interactive mode also exists as a .NET example (`dotnet/examples/Kokoro.Interactive/`, built by the solution above,
+not shipped in the NuGet packages):
+
+```powershell
+dotnet run --project dotnet/examples/Kokoro.Interactive -c Release -- --device cpu
+```
+
 ## English G2P
 
 English words are converted to phonemes in the following order (output uses the Kokoro/misaki English phoneme set):
@@ -359,6 +366,12 @@ target_link_libraries(app PRIVATE kokoro::kokoro)
 dotnet test dotnet/Kokoro.Net.sln -c Release
 ./packaging/pack.ps1                            # -> artifacts/nuget/*.nupkg
 ./packaging/smoke.ps1 -Framework net8.0         # 基于本地源的端到端检查
+```
+
+交互模式另有一个 .NET 示例（`dotnet/examples/Kokoro.Interactive/`，由上述解决方案构建，不随 NuGet 包发布）：
+
+```powershell
+dotnet run --project dotnet/examples/Kokoro.Interactive -c Release -- --device cpu
 ```
 
 ## 英文 G2P
@@ -562,6 +575,13 @@ Como alternativa, `add_subdirectory(kokoro.cpp)` y enlaza `kokoro::kokoro`.
 dotnet test dotnet/Kokoro.Net.sln -c Release
 ./packaging/pack.ps1                            # -> artifacts/nuget/*.nupkg
 ./packaging/smoke.ps1 -Framework net8.0         # prueba de extremo a extremo con el feed local
+```
+
+El modo interactivo también existe como ejemplo de .NET (`dotnet/examples/Kokoro.Interactive/`, compilado por la
+solución anterior, no se incluye en los paquetes NuGet):
+
+```powershell
+dotnet run --project dotnet/examples/Kokoro.Interactive -c Release -- --device cpu
 ```
 
 ## G2P español

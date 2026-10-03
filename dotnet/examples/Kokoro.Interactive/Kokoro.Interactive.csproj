@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- NAudio.WinMM 3.x targets net9.0-windows only; Kokoro.Net's net10.0 build is used. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>Kokoro.Interactive</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio.WinMM" Version="3.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ORT native binaries come from the package; kokoro.dll comes from KokoroNatives.targets. -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="$(KokoroOrtVersion)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Kokoro.Net\Kokoro.Net.csproj" />
+  </ItemGroup>
+  <Import Project="..\..\KokoroNatives.targets" />
+</Project>

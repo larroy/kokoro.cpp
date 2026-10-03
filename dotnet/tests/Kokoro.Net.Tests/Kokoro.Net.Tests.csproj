@@ -3,7 +3,6 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
-    <KokoroNativeDir Condition="'$(KokoroNativeDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\artifacts\natives\$(NETCoreSdkRuntimeIdentifier)\</KokoroNativeDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,17 +16,6 @@
     <ProjectReference Include="..\..\src\Kokoro.Net\Kokoro.Net.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- kokoro.dll sits next to the package's onnxruntime.dll in runtimes/<rid>/native/, so it loads the ORT of its
-         own architecture. -->
-    <None Include="$(KokoroNativeDir)kokoro.dll" Link="runtimes\$(NETCoreSdkRuntimeIdentifier)\native\kokoro.dll"
-          CopyToOutputDirectory="PreserveNewest" Visible="false" />
-  </ItemGroup>
-
-  <!-- BeforeBuild, not Build: Build's DependsOnTargets (CoreBuild) would copy the missing files first. -->
-  <Target Name="KokoroCheckNatives" BeforeTargets="BeforeBuild">
-    <Error Condition="!Exists('$(KokoroNativeDir)kokoro.dll')"
-           Text="kokoro.dll not found in $(KokoroNativeDir); run packaging/build-natives.ps1 or pass -p:KokoroNativeDir=&lt;dir&gt;" />
-  </Target>
+  <Import Project="..\..\KokoroNatives.targets" />
 
 </Project>
