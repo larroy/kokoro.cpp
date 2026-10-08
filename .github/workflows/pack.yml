@@ -138,6 +138,8 @@ jobs:
 
       - name: Push to nuget.org
         shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
         run: |
           $version = $env:GITHUB_REF_NAME.Substring(1)
           $packages = @(
@@ -149,7 +151,7 @@ jobs:
           foreach ($name in $packages) {
             $path = Join-Path 'artifacts/nuget' $name
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing package: $path" }
-            $pushArgs = @($path, '--source',
+            $pushArgs = @($path, '--api-key', $env:NUGET_API_KEY, '--source',
               'https://api.nuget.org/v3/index.json', '--skip-duplicate')
             dotnet nuget push @pushArgs
             if ($LASTEXITCODE -ne 0) { throw "NuGet push failed: $name" }
