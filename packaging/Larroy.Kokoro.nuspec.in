@@ -22,6 +22,9 @@
   </metadata>
   <files>
     <file src="@README@" target="README.md" />
+@LICENSES@
+    <file src="@DICT@\**\*" target="kokoro-dict" />
+    <file src="@TARGETS@" target="buildTransitive/Larroy.Kokoro.targets" />
     <file src="@BIN@\net8.0\Kokoro.Net.dll" target="lib/net8.0" />
     <file src="@BIN@\net8.0\Kokoro.Net.xml" target="lib/net8.0" />
     <file src="@BIN@\net10.0\Kokoro.Net.dll" target="lib/net10.0" />

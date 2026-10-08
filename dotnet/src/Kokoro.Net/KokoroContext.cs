@@ -35,6 +35,9 @@ public sealed class KokoroContext : IDisposable
     /// <returns>The value of <c>kokoro_version()</c>.</returns>
     public static string Version() => Marshal.PtrToStringUTF8(KokoroNative.kokoro_version())!;
 
+    /// <summary>Directory where the Larroy.Kokoro package copies the G2P dictionaries (<c>&lt;app&gt;/kokoro-dict</c>).</summary>
+    public static string BundledDictDirectory { get; } = Path.Combine(AppContext.BaseDirectory, "kokoro-dict");
+
     /// <summary>Number of voices in the loaded voices file.</summary>
     public int VoiceCount => checked((int)KokoroNative.kokoro_voice_count(_handle));
 

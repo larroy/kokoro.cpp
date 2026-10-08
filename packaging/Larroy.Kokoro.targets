@@ -1,0 +1,8 @@
+<Project>
+  <!-- Copies the G2P dictionaries shipped in this package to <output>/kokoro-dict (KokoroContext.BundledDictDirectory). -->
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)..\kokoro-dict\**\*"
+             Link="kokoro-dict\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>

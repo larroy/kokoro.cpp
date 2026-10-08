@@ -10,7 +10,7 @@ param(
     [string]$Feed = 'artifacts/nuget',
     [string]$Model = 'models/kokoro-v1.1-zh.onnx',
     [string]$Voices = 'models/voices-v1.1-zh.bin',
-    [string]$Dict = 'dict',
+    [string]$Dict = 'bundled',
     [string]$OnnxRuntimeVersion = '1.30.0'
 )
 
@@ -48,7 +48,8 @@ function New-SmokeApp([string]$Work, [string]$Version) {
 
 function Invoke-Synthesis([string]$App, [string]$Version) {
     Invoke-Checked dotnet @('run', '--project', $App, '-c', 'Release', '--',
-        (Resolve-RepoPath $Model), (Resolve-RepoPath $Voices), (Resolve-RepoPath $Dict), $Version)
+        (Resolve-RepoPath $Model), (Resolve-RepoPath $Voices),
+        $(if ($Dict -eq 'bundled') { 'bundled' } else { Resolve-RepoPath $Dict }), $Version)
 }
 
 function Assert-Arm64([string]$Path) {
@@ -84,6 +85,7 @@ function Assert-Arm64Build([string]$App, [string]$Work) {
     $x64Natives = Join-Path $out 'runtimes/win-x64'
     if (Test-Path $x64Natives) { throw "win-arm64 output contains x64 natives: $x64Natives" }
     Assert-AppOrt $out
+    if (-not (Test-Path (Join-Path $out 'kokoro-dict/vocab.txt'))) { throw "kokoro-dict missing from $out" }
 }
 
 $version = Get-KokoroVersion

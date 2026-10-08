@@ -13,6 +13,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $feed = Join-Path $root 'artifacts/nuget'
 $nuspecDir = Join-Path $root 'artifacts/obj/nuspec'
 $readme = Join-Path $PSScriptRoot 'README.md'
+$licenseFiles = @('LICENSE', 'THIRD_PARTY_NOTICES.md')
 
 function Reset-Directory([string]$Path) {
     if (Test-Path $Path) { Remove-Item $Path -Recurse -Force }
@@ -38,11 +39,19 @@ function Get-BuildTransitiveEntries([hashtable]$Package, [string]$Id) {
     "    <file src=`"$src`" target=`"buildTransitive/$Id.targets`" />"
 }
 
+function Get-LicenseEntries {
+    foreach ($name in $licenseFiles) {
+        $src = Join-Path $root $name
+        if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { throw "Missing license file: $src" }
+        "    <file src=`"$src`" target=`"$name`" />"
+    }
+}
+
 function Get-FileEntries([hashtable]$Row, [hashtable]$Package, [string]$Id) {
     $natives = @($Package.Files | ForEach-Object {
             "    <file src=`"$(Get-NativeSource $Row $_)`" target=`"runtimes/$($Row.Rid)/native/$_`" />"
         })
-    (@($natives) + @(Get-BuildTransitiveEntries $Package $Id)) -join "`n"
+    (@($natives) + @(Get-BuildTransitiveEntries $Package $Id) + @(Get-LicenseEntries)) -join "`n"
 }
 
 function Get-DependencyEntries([hashtable]$Package, [string]$OrtVersion) {
@@ -79,6 +88,9 @@ function New-WrapperPackage([object[]]$Rows, [string]$Version) {
     $tokens = @{
         VERSION = $Version; README = $readme; DEPENDENCIES = $dependencies
         BIN = Join-Path $root 'dotnet/src/Kokoro.Net/bin/Release'
+        LICENSES = (Get-LicenseEntries) -join "`n"
+        DICT = Join-Path $root 'dict'
+        TARGETS = Join-Path $PSScriptRoot 'Larroy.Kokoro.targets'
     }
     New-Nuspec (Join-Path $PSScriptRoot 'Larroy.Kokoro.nuspec.in') $tokens $nuspec
     $project = Join-Path $root 'dotnet/src/Kokoro.Net/Kokoro.Net.csproj'

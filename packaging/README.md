@@ -20,7 +20,7 @@ dotnet add package Larroy.Kokoro
 using Kokoro.Net;
 
 using var ctx = new KokoroContext(
-    "models/kokoro-v1.1-zh.onnx", "models/voices-v1.1-zh.bin", "dict",
+    "models/kokoro-v1.1-zh.onnx", "models/voices-v1.1-zh.bin", KokoroContext.BundledDictDirectory,
     new KokoroOptions(KokoroDevice.Cpu, 0));
 KokoroAudio audio = ctx.Synthesize("Hello world.", "af_maple");
 // audio.Samples: mono float PCM; audio.SampleRate: 24000 (24 kHz).
@@ -30,8 +30,11 @@ Failures throw `KokoroException`; its `Status` mirrors the C API status code.
 
 ## Model files are not included
 
-The model, the voices file and the `dict/` directory are passed by path; no package contains them. Get them by
-running `uv run bootstrap.py configure` in the kokoro.cpp repository, or download the release URLs it pins.
+The model and the voices file are passed by path; no package contains them. Get them by running
+`uv run bootstrap.py configure` in the kokoro.cpp repository, or download the release URLs it pins.
+
+The G2P dictionaries are tied to the native code version, so `Larroy.Kokoro` ships them and copies them to
+`<output>/kokoro-dict` on build and publish. Pass `KokoroContext.BundledDictDirectory` as `dictDir`.
 
 ## Threading
 
