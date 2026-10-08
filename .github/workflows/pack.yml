@@ -108,8 +108,13 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
 
       - uses: actions/download-artifact@v8
         with:
@@ -121,11 +126,36 @@ jobs:
         run: |
           Import-Module ./packaging/Kokoro.Packaging.psm1 -Force
           $expected = "v$(Get-KokoroVersion)"
-          if ($expected -ne $env:GITHUB_REF_NAME) { throw "Tag $env:GITHUB_REF_NAME does not match package version $expected" }
+          if ($expected -ne $env:GITHUB_REF_NAME) {
+            throw "Tag $env:GITHUB_REF_NAME does not match package version $expected"
+          }
+
+      - name: NuGet login
+        id: nuget_login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
 
       - name: Push to nuget.org
         shell: pwsh
-        run: dotnet nuget push "artifacts/nuget/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+        run: |
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $packages = @(
+            "Larroy.Kokoro.runtime.win-arm64.$version.nupkg"
+            "Larroy.Kokoro.runtime.win-x64.$version.nupkg"
+            "Larroy.Kokoro.runtime.win-x64.cuda.$version.nupkg"
+            "Larroy.Kokoro.$version.nupkg"
+          )
+          foreach ($name in $packages) {
+            $path = Join-Path 'artifacts/nuget' $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing package: $path" }
+            $pushArgs = @($path, '--api-key', $env:NUGET_API_KEY, '--source',
+              'https://api.nuget.org/v3/index.json', '--skip-duplicate')
+            dotnet nuget push @pushArgs
+            if ($LASTEXITCODE -ne 0) { throw "NuGet push failed: $name" }
+          }
 
       - name: Create GitHub release
         shell: pwsh
