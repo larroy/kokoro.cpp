@@ -189,6 +189,7 @@ TEST_CASE("spanish_loanwords") {
         {"Me gusta el jazz y el croissant.", "me ɣˈusta el ʝˈas i el kɾwasˈan."},
         {"Dos parkings, JAZZ, whiskey.", "dˈos pˈaɾkins, ʝˈas, wˈiski."},
         {"Un güisqui en el show.", "ˈuŋ ɡwˈiski en el ʃˈO."},
+        {"Lo vi en Facebook.", "lo βˈi en fˈAsβuk."},
     };
     for (const Case& c : cases) {
         const std::string input = c.input;

@@ -15,6 +15,7 @@ const std::unordered_map<std::u16string, std::u16string> kBuiltin = {
     {u"parking", u"párkin"},  {u"marketing", u"márketin"}, {u"show", u"ʃóu"},       {u"shampoo", u"ʃampú"},
     {u"shopping", u"ʃópin"},  {u"software", u"sóftuer"},   {u"whisky", u"uíski"},   {u"whiskey", u"uíski"},
     {u"güisqui", u"gwíski"},  {u"croissant", u"cruasán"},  {u"pizza", u"pítsa"},    {u"jazz", u"yas"},
+    {u"facebook", u"féisbuk"},
 };
 
 // Lowercases text with spanish_to_lower.
