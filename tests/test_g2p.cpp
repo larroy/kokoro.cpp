@@ -190,6 +190,17 @@ TEST_CASE("spanish_loanwords") {
         {"Dos parkings, JAZZ, whiskey.", "dˈos pˈaɾkins, ʝˈas, wˈiski."},
         {"Un güisqui en el show.", "ˈuŋ ɡwˈiski en el ʃˈO."},
         {"Lo vi en Facebook.", "lo βˈi en fˈAsβuk."},
+        {"Búscalo en Google.", "bˈuskalo eŋ ɡˈuɣel."},
+        {"Vi el thriller en Netflix con mi iPhone.", "bˈi el tɾˈileɾ en nˈetfliks kon mi ˈIfon."},
+        {"El manager del ranking usa WhatsApp y email.", "el mˈanaʝeɾ ðel rˈankin ˈusa wˈatsap i ˈimAl."},
+        {"Un sandwich, un spray y un blazer.", "ˈun sˈandwiʧ, ˈun espɾˈA i ˈum blˈAseɾ."},
+        {"Spaghetti, gnocchi, lasagna y mozzarella.", "espaɣˈeti, ɲˈoki, lasˈaɲa i motsaɾˈela."},
+        {"Un cappuccino y bruschetta.", "ˈun kapuʧˈino i βɾuskˈeta."},
+        {"Paparazzi, graffiti, tsunami, spaghettis.", "papaɾˈatsi, ɡɾafˈiti, tsunˈami, espaɣˈetis."},
+        {"Sushi, sashimi y pretzel en un yacht.", "sˈuʃi, saʃˈimi i pɾˈetsel en ˈun ʝˈot."},
+        {"Un déjà vu en el kindergarten.", "ˈun dˈeʝa βˈu en el kˈindeɾɣaɾten."},
+        {"Menú À LA CARTE, status quo.", "menˈu a la kˈaɾt, estˈatus kwˈo."},
+        {"Mi résumé y curriculum vitae.", "mi resumˈe i kurˈikulum bˈitae."},
     };
     for (const Case& c : cases) {
         const std::string input = c.input;
