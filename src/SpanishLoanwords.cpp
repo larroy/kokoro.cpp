@@ -66,6 +66,7 @@ char16_t spanish_to_lower(char16_t c) {
     return c;
 }
 
+// Looks c up in the grave vowels and returns the plain vowel at the same index, keeping its case.
 char16_t fold_grave(char16_t c) {
     static constexpr std::u16string_view grave = u"àèìòùÀÈÌÒÙ";
     static constexpr std::u16string_view plain = u"aeiouAEIOU";
