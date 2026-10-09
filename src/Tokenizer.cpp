@@ -26,6 +26,7 @@ Tokenizer::Tokenizer(const TokenizerConfig& config, const std::map<std::string, 
         jieba_dict, hmm_model, user_dict, idf_path, stop_word_path, pinyin_char, pinyin_phrase
     );
     g2p_ = std::make_unique<ZHG2P>(processor_, "1.1", "<unk>", cmu_dict, user_en_dict, g2p_en_model);
+    spanish_loanwords_ = SpanishLoanwords::load(d + config.es_loanwords);
 }
 
 Tokenizer::~Tokenizer() = default;
@@ -62,7 +63,7 @@ std::vector<int> Tokenizer::tokenize(const std::string& phonemes) {
 }
 
 std::string Tokenizer::phonemize(const std::string& text, G2PLanguage language) {
-    return language == G2PLanguage::Spanish ? spanish_to_phonemes(text, number_language_) : (*g2p_)(text).first;
+    return language == G2PLanguage::Spanish ? spanish_to_phonemes(text, number_language_, spanish_loanwords_) : (*g2p_)(text).first;
 }
 
 void Tokenizer::set_number_language(NumberLanguage language) {

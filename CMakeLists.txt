@@ -107,6 +107,7 @@ add_library(kokoro_core STATIC
     src/ZHFrontend.cpp
     src/NeuralG2P.cpp
     src/SpanishG2P.cpp
+    src/SpanishLoanwords.cpp
 )
 target_include_directories(kokoro_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src

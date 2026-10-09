@@ -43,13 +43,6 @@ const std::array<std::u16string, 33> kUnstressed = {
 // True when c occurs in set.
 bool contains(const std::u16string& set, char16_t c) { return set.find(c) != std::u16string::npos; }
 
-// ASCII and Spanish capitals (ÁÉÍÓÚÜÑ) to lowercase. Other characters are unchanged.
-char16_t to_lower(char16_t c) {
-    if (c >= u'A' && c <= u'Z') return static_cast<char16_t>(c + 32);
-    if (contains(u"ÁÉÍÓÚÜÑ", c)) return static_cast<char16_t>(c + 0x20);
-    return c;
-}
-
 // Lowercase Spanish letter, including accented vowels and ñ.
 bool is_letter(char16_t c) { return (c >= u'a' && c <= u'z') || contains(u"áéíóúüñ", c); }
 
@@ -69,7 +62,7 @@ void push_space(std::vector<Segment>& segments) {
 // Appends raw: extends the open Word (tracking all_caps), emits one Punct, or collapses a separator into Space.
 // Anything else is dropped.
 void push_char(std::vector<Segment>& segments, char16_t raw) {
-    const char16_t c = to_lower(raw);
+    const char16_t c = spanish_to_lower(raw);
     if (is_letter(c)) {
         if (segments.empty() || segments.back().type != SegmentType::Word) segments.push_back({SegmentType::Word, u""});
         segments.back().text += c;
@@ -234,11 +227,11 @@ void stress_nucleus(std::vector<Unit>& units, const std::vector<Nucleus>& nuclei
     open_stressed_e(units, nuclei[stressed].main);
 }
 
-// Fills segment.units from its letters and places stress.
-void phonemize_word(Segment& segment) {
-    segment.units = letters_to_units(segment.text);
+// Fills segment.units from spelling, its letters or a loanword respelling, and places stress.
+void phonemize_word(Segment& segment, const std::u16string& spelling) {
+    segment.units = letters_to_units(spelling);
     const std::vector<Nucleus> nuclei = find_nuclei(segment.units);
-    stress_nucleus(segment.units, nuclei, stressed_nucleus(nuclei, segment.text));
+    stress_nucleus(segment.units, nuclei, stressed_nucleus(nuclei, spelling));
 }
 
 // ---- acronyms ----
@@ -314,6 +307,18 @@ void spell_word(Segment& segment) {
     const size_t stressed = last_nuclei.size() == 1 ? 0 : stressed_nucleus(last_nuclei, last_name);
     for (Nucleus& nucleus : last_nuclei) nucleus.main += offset;
     stress_nucleus(segment.units, last_nuclei, stressed);
+}
+
+// Fills segment.units: a listed loanword from its respelling, an unpronounceable acronym by letter names, else
+// from its letters.
+void phonemize_segment(Segment& segment, const SpanishLoanwords& loanwords) {
+    if (const auto respelling = loanwords.respell(segment.text)) {
+        phonemize_word(segment, *respelling);
+    } else if (spelled_acronym(segment)) {
+        spell_word(segment);
+    } else {
+        phonemize_word(segment, segment.text);
+    }
 }
 
 // ---- allophones ----
@@ -399,19 +404,14 @@ std::u16string tidy_spaces(const std::u16string& text) {
 
 }  // namespace
 
-std::string spanish_to_phonemes(const std::string& text, NumberLanguage numbers) {
+std::string spanish_to_phonemes(const std::string& text, NumberLanguage numbers, const SpanishLoanwords& loanwords) {
     const std::string normalized =
         normalize_numbers(text, numbers == NumberLanguage::Auto ? NumberLanguage::Spanish : numbers);
     std::u16string wide;
     BasicStringUtil::u8tou16(normalized.c_str(), normalized.size(), wide);
     std::vector<Segment> segments = scan(wide);
     for (Segment& segment : segments) {
-        if (segment.type != SegmentType::Word) continue;
-        if (spelled_acronym(segment)) {
-            spell_word(segment);
-        } else {
-            phonemize_word(segment);
-        }
+        if (segment.type == SegmentType::Word) phonemize_segment(segment, loanwords);
     }
     apply_allophones(segments);
     std::u16string rendered;

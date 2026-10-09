@@ -186,6 +186,14 @@ English words are converted to phonemes in the following order (output uses the 
 python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 ```
 
+## Spanish loanwords
+
+Loanwords whose Spanish pronunciation does not follow their spelling (`parking`, `pizza`, `show`, `jazz`, ...) are
+read from a Spanish respelling instead (`párkin`, `pítsa`, `ʃóu`, `yas`). A built-in table covers common words; the
+plural `-s` of a listed word is handled too. Add or override entries in the optional `dict/es_loanwords.tsv`, one
+`word<TAB>respelling` per line (`#` starts a comment). Write the respelling in Spanish orthography with a written
+accent on the stressed vowel; sounds Spanish spelling lacks are written as IPA (`ʃ`).
+
 ## Project Structure
 
 - `include/kokoro/kokoro.h`, `src/kokoro_c.cpp`: public C API of `libkokoro`.

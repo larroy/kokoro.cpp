@@ -12,6 +12,8 @@
 
 #include <cstdio>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -177,6 +179,35 @@ TEST_CASE("spanish_g2p") {
         CAPTURE(input);
         CHECK(spanish_to_phonemes(input, NumberLanguage::Auto) == std::string(c.expected));
     }
+}
+
+TEST_CASE("spanish_loanwords") {
+    static const Case cases[] = {
+        {"Voy al parking a comprar pizza y whisky.", "bˈoɪ al pˈaɾkin a kompɾˈaɾ pˈitsa i wˈiski."},
+        {"El marketing del show.", "el mˈaɾketin del ʃˈO."},
+        {"Champú, shampoo, shopping, software.", "ʧampˈu, ʃampˈu, ʃˈopin, sˈoftweɾ."},
+        {"Me gusta el jazz y el croissant.", "me ɣˈusta el ʝˈas i el kɾwasˈan."},
+        {"Dos parkings, JAZZ, whiskey.", "dˈos pˈaɾkins, ʝˈas, wˈiski."},
+        {"Un güisqui en el show.", "ˈuŋ ɡwˈiski en el ʃˈO."},
+    };
+    for (const Case& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(spanish_to_phonemes(input, NumberLanguage::Auto) == std::string(c.expected));
+    }
+}
+
+TEST_CASE("spanish_loanwords_tsv") {
+    const std::filesystem::path tsv = std::filesystem::temp_directory_path() / "kokoro_test_es_loanwords.tsv";
+    {
+        std::ofstream out(tsv);
+        out << "# word\trespelling\n\nPizza\tpíza\nwifi\tuáifai\nmalformed\n";
+    }
+    const SpanishLoanwords loanwords = SpanishLoanwords::load(tsv.string());
+    std::filesystem::remove(tsv);
+    CHECK(spanish_to_phonemes("Pizza con wifi y jazz.", NumberLanguage::Auto, loanwords) ==
+          std::string("pˈiθa kon wˈIfI i ʝˈas."));
+    CHECK(SpanishLoanwords::load("/nonexistent/es_loanwords.tsv").respell(u"jazz") == std::u16string(u"yas"));
 }
 
 TEST_CASE("single_letter_words") {
