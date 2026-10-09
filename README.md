@@ -204,7 +204,7 @@ accent on the stressed vowel; sounds Spanish spelling lacks are written as IPA (
 - `eval_bench/`: G2P evaluation against espeak-ng (`g2p_dump`, `compare_g2p.py`, corpora).
 - `tests/`: library tests (run with `ctest`); `tests/python/`: tests for the Python tools (run with `uv run pytest`).
 - `dotnet/`, `packaging/`: .NET wrapper (`Larroy.Kokoro`) and the scripts that build its NuGet packages.
-- `docs/`: guides ([adding voices](docs/adding-voices.md)).
+- `docs/`: guides ([adding voices](docs/adding-voices.md), [thread safety](docs/thread-safety.md)).
 - `scripts/`: helper scripts for data processing.
 - `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
 
@@ -408,7 +408,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `eval_bench/`: 与 espeak-ng 对比的 G2P 评测（`g2p_dump`、`compare_g2p.py`、语料）。
 - `tests/`: 库测试（使用 `ctest` 运行）；`tests/python/`：Python 工具的测试（使用 `uv run pytest` 运行）。
 - `dotnet/`, `packaging/`: .NET 封装（`Larroy.Kokoro`）及构建其 NuGet 包的脚本。
-- `docs/`: 使用指南（[添加语音](docs/adding-voices.md)）。
+- `docs/`: 使用指南（[添加语音](docs/adding-voices.md)、[线程安全](docs/thread-safety.md)（英文））。
 - `scripts/`: 数据处理辅助脚本。
 - `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
 
@@ -632,7 +632,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `eval_bench/`: evaluación del G2P frente a espeak-ng (`g2p_dump`, `compare_g2p.py`, corpus).
 - `tests/`: pruebas de la biblioteca (con `ctest`); `tests/python/`: pruebas de las herramientas de Python (con `uv run pytest`).
 - `dotnet/`, `packaging/`: wrapper de .NET (`Larroy.Kokoro`) y los scripts que generan sus paquetes NuGet.
-- `docs/`: guías ([añadir voces](docs/adding-voices.md)).
+- `docs/`: guías ([añadir voces](docs/adding-voices.md), [seguridad entre hilos](docs/thread-safety.md) (en inglés)).
 - `scripts/`: scripts auxiliares de procesamiento de datos.
 - `dict/`: diccionarios del G2P (Jieba, pinyin, CMU, pesos de g2p_en).
 
