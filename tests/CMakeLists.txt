@@ -31,6 +31,10 @@ add_executable(test_g2p test_g2p.cpp)
 target_link_libraries(test_g2p PRIVATE kokoro_core kokoro_doctest)
 add_test(NAME g2p COMMAND test_g2p "${KOKORO_TEST_DICT_DIR}")
 
+add_executable(test_chunker test_chunker.cpp)
+target_link_libraries(test_chunker PRIVATE kokoro_core kokoro_doctest)
+add_test(NAME chunker COMMAND test_chunker)
+
 # Windows has no rpath: put kokoro.dll and the ONNX Runtime DLLs next to the test executables.
 if (WIN32)
     foreach(test_target test_c_api test_synthesis test_synthesis_es)

@@ -99,6 +99,7 @@ endif()
 # Internal implementation, linked into libkokoro and test_g2p.
 add_library(kokoro_core STATIC
     src/Kokoro.cpp
+    src/PhonemeChunker.cpp
     src/Tokenizer.cpp
     src/ZHG2P.cpp
     src/NumberNormalizer.cpp

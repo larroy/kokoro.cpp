@@ -171,6 +171,14 @@ TEST_CASE("phoneme_input_matches_text_input") {
     CHECK(from_text.size() == from_phonemes.size());
 }
 
+// A chunk with no in-vocabulary phonemes is skipped rather than run on the padding tokens alone.
+TEST_CASE("tokenless_phonemes_produce_no_audio") {
+    kokoro_status status = KOKORO_ERROR_UNKNOWN;
+    const std::vector<float> samples = synth("###", kVoice, 1.0f, KOKORO_INPUT_PHONEMES, &status);
+    CHECK(status == KOKORO_OK);
+    CHECK(samples.size() == 0);
+}
+
 TEST_CASE("faster_speed_is_shorter") {
     kokoro_status normal_status = KOKORO_ERROR_UNKNOWN;
     kokoro_status fast_status = KOKORO_ERROR_UNKNOWN;

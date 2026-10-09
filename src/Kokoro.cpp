@@ -1,8 +1,8 @@
 #include "Kokoro.h"
 #include "Tokenizer.h"
+#include "PhonemeChunker.h"
 #include <fstream>
 #include <sstream>
-#include <regex>
 #include <numeric>
 #include <cstring>
 #include <filesystem>
@@ -209,39 +209,6 @@ G2PLanguage Kokoro::language_for(const std::string& voice_name) const {
     return spanish_voice ? G2PLanguage::Spanish : G2PLanguage::ChineseEnglish;
 }
 
-std::vector<std::string> Kokoro::_split_phonemes(const std::string& phonemes) {
-    std::vector<std::string> batches;
-    std::regex re("([.,!?;])");
-    std::sregex_token_iterator it(phonemes.begin(), phonemes.end(), re, {-1, 0}); // -1 for non-match, 0 for match
-    std::sregex_token_iterator end;
-
-    std::string current_batch;
-    
-    for (; it != end; ++it) {
-        std::string part = *it;
-        // Removing leading/trailing whitespace
-        part = std::regex_replace(part, std::regex("^\\s+|\\s+$"), "");
-        
-        if (part.empty()) continue;
-
-        if (current_batch.length() + part.length() + 1 >= MAX_PHONEME_LENGTH) {
-            batches.push_back(current_batch);
-            current_batch = part;
-        } else {
-             if (std::string(".,!?;").find(part) != std::string::npos) {
-                current_batch += part;
-             } else {
-                if (!current_batch.empty()) current_batch += " ";
-                current_batch += part;
-             }
-        }
-    }
-    if (!current_batch.empty()) {
-        batches.push_back(current_batch);
-    }
-    return batches;
-}
-
 std::pair<std::vector<float>, int> Kokoro::_create_audio(
     const std::string& phonemes,
     const std::vector<float>& voice,
@@ -253,6 +220,9 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
     }
 
     std::vector<int> tokens_raw = tokenizer_->tokenize(truncated_phonemes);
+    // Nothing to say: skip the model rather than run it on the padding tokens alone, as upstream
+    // Kokoro skips empty phoneme strings (`if not ps: continue`).
+    if (tokens_raw.empty()) return {{}, SAMPLE_RATE};
 
     // Add start and end tokens (0)
     std::vector<int64_t> tokens = {0};
@@ -263,10 +233,9 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
     std::vector<int64_t> input_shape = {1, (int64_t)tokens.size()};
     
     // A voice holds one style row per chunk length: n tokens use row n - 1, as upstream Kokoro
-    // (`pack[len(ps)-1]`) and kokoro-onnx do. Lengths past the table use its last row; a chunk with
-    // no in-vocabulary tokens uses row 0.
+    // (`pack[len(ps)-1]`) and kokoro-onnx do. Lengths past the table use its last row.
     const size_t rows = voice.size() / STYLE_DIM;
-    const size_t row = std::min(std::max<size_t>(tokens_raw.size(), 1), rows) - 1;
+    const size_t row = std::min(tokens_raw.size(), rows) - 1;
     const auto style_begin = voice.begin() + row * STYLE_DIM;
     std::vector<float> selected_style(style_begin, style_begin + STYLE_DIM);
 
@@ -353,7 +322,7 @@ std::pair<std::vector<float>, int> Kokoro::create(
         phonemes = phonemize(text, language);
     }
     
-    auto batched_phonemes = _split_phonemes(phonemes);
+    auto batched_phonemes = split_phonemes(phonemes, MAX_PHONEME_LENGTH);
     std::vector<float> full_audio;
     
     for (const auto& batch : batched_phonemes) {

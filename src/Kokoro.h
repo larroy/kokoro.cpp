@@ -149,6 +149,4 @@ private:
         const std::vector<float>& voice,
         float speed
     );
-
-    std::vector<std::string> _split_phonemes(const std::string& phonemes);
 };
