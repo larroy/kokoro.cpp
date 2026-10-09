@@ -23,11 +23,12 @@ struct Unit {
 
 enum class SegmentType { Word, Punct, Space };
 
+// One scanned piece of the utterance: a word, one punctuation mark, or a collapsed run of whitespace.
 struct Segment {
     SegmentType type;
-    std::u16string text;  // lowercased letters for Word, the symbol for Punct
-    std::vector<Unit> units;
-    bool all_caps = true;  // Word: every letter was written in upper case
+    std::u16string text;      // Word: lowercased letters; Punct: the symbol; Space: " "
+    std::vector<Unit> units;  // Word only; filled when the word is phonemized or spelled
+    bool all_caps = true;     // Word: every letter was written in upper case
 };
 
 const std::u16string kKeptPunct = u";:,.!?¿¡—…\"()“”";
@@ -39,26 +40,34 @@ const std::array<std::u16string, 33> kUnstressed = {
     u"lo", u"los", u"me",  u"mi",  u"mis", u"ni", u"nos", u"o",   u"os", u"por", u"que", u"se",
     u"si", u"sin", u"su",  u"sus", u"te",  u"tu", u"tus", u"u",   u"y"};
 
+// True when c occurs in set.
 bool contains(const std::u16string& set, char16_t c) { return set.find(c) != std::u16string::npos; }
 
+// ASCII and Spanish capitals (ÁÉÍÓÚÜÑ) to lowercase. Other characters are unchanged.
 char16_t to_lower(char16_t c) {
     if (c >= u'A' && c <= u'Z') return static_cast<char16_t>(c + 32);
     if (contains(u"ÁÉÍÓÚÜÑ", c)) return static_cast<char16_t>(c + 0x20);
     return c;
 }
 
+// Lowercase Spanish letter, including accented vowels and ñ.
 bool is_letter(char16_t c) { return (c >= u'a' && c <= u'z') || contains(u"áéíóúüñ", c); }
 
+// Lowercase vowel: aeiou, an accented form, or ü.
 bool is_vowel_letter(char16_t c) { return contains(u"aeiouáéíóúü", c); }
 
+// e or i, plain or accented: the vowels that turn c into θ and g into x.
 bool is_front(char16_t c) { return contains(u"eiéí", c); }
 
 // ---- scanning ----
 
+// Appends one Space, collapsing a run of whitespace or hyphens.
 void push_space(std::vector<Segment>& segments) {
     if (segments.empty() || segments.back().type != SegmentType::Space) segments.push_back({SegmentType::Space, u" "});
 }
 
+// Appends raw: extends the open Word (tracking all_caps), emits one Punct, or collapses a separator into Space.
+// Anything else is dropped.
 void push_char(std::vector<Segment>& segments, char16_t raw) {
     const char16_t c = to_lower(raw);
     if (is_letter(c)) {
@@ -73,6 +82,7 @@ void push_char(std::vector<Segment>& segments, char16_t raw) {
     }
 }
 
+// Splits text into Word, Punct, and Space segments. Letters are lowercased; anything else is dropped.
 std::vector<Segment> scan(const std::u16string& text) {
     std::vector<Segment> segments;
     for (const char16_t c : text) push_char(segments, c);
@@ -81,6 +91,7 @@ std::vector<Segment> scan(const std::u16string& text) {
 
 // ---- letters to units ----
 
+// Vowel letter to a Unit. An accent marks stress; i and u are weak; ü stays syllabic.
 Unit vowel(char16_t c) {
     static const std::u16string accented = u"áéíóú";
     static const std::u16string plain = u"aeiou";
@@ -90,6 +101,7 @@ Unit vowel(char16_t c) {
     return {std::u16string(1, c), Kind::Vowel, false, contains(u"iu", c)};
 }
 
+// IPA string to a Unit, classified from its first symbol as nasal, lateral, rhotic, or other.
 Unit consonant(const std::u16string& ipa) {
     if (contains(u"mnɲŋ", ipa[0])) return {ipa, Kind::Nasal};
     if (ipa == u"l" || ipa == u"ʎ") return {ipa, Kind::Lateral};
@@ -133,6 +145,7 @@ size_t silent_prefix(const std::u16string& word) {
     return start == u"ps" || start == u"gn" ? 1 : 0;
 }
 
+// Maps each letter of word to a Unit. Drops a silent ps/gn prefix and h, and keeps i/u after r or ʎ syllabic.
 std::vector<Unit> letters_to_units(const std::u16string& word) {
     std::vector<Unit> units;
     for (size_t i = silent_prefix(word); i < word.size();) {
@@ -152,14 +165,16 @@ std::vector<Unit> letters_to_units(const std::u16string& word) {
 
 // ---- nuclei and stress ----
 
+// One syllable core: the vowel or diphthong a syllable is built around. Consonants stay on the surrounding Units.
 struct Nucleus {
-    size_t main;  // index of the main vowel in the word's units
-    bool accented;
+    size_t main;    // index of the syllabic vowel in the word's units
+    bool accented;  // that vowel has a written accent, so this nucleus is stressed
 };
 
+// Not a weak unaccented vowel, so it can head a syllable.
 bool strong(const Unit& u) { return !u.weak || u.accented; }
 
-// Main vowel of the vowel run [begin, end): the first strong one, else the last.
+// Index of the main vowel in the run [begin, end): the first strong one, else the last.
 size_t main_vowel(const std::vector<Unit>& units, size_t begin, size_t end) {
     for (size_t i = begin; i < end; ++i) {
         if (strong(units[i])) return i;
@@ -189,6 +204,7 @@ std::vector<Nucleus> find_nuclei(std::vector<Unit>& units) {
     return nuclei;
 }
 
+// Function word from kUnstressed, which carries no lexical stress.
 bool unstressed_word(const std::u16string& word) {
     return std::find(kUnstressed.begin(), kUnstressed.end(), word) != kUnstressed.end();
 }
@@ -211,12 +227,14 @@ void open_stressed_e(std::vector<Unit>& units, size_t main) {
     if (open) units[main].ipa = u"ɛ";
 }
 
+// Marks nuclei[stressed] and opens a stressed e before n + consonant.
 void stress_nucleus(std::vector<Unit>& units, const std::vector<Nucleus>& nuclei, size_t stressed) {
     if (stressed >= nuclei.size()) return;
     units[nuclei[stressed].main].stressed = true;
     open_stressed_e(units, nuclei[stressed].main);
 }
 
+// Fills segment.units from its letters and places stress.
 void phonemize_word(Segment& segment) {
     segment.units = letters_to_units(segment.text);
     const std::vector<Nucleus> nuclei = find_nuclei(segment.units);
@@ -233,6 +251,7 @@ const std::array<std::u16string, 33> kLetterNames = {
 const std::array<std::u16string, 14> kOnsetClusters = {u"pl", u"pr", u"bl", u"br", u"tr", u"dr", u"cl",
                                                        u"cr", u"gl", u"gr", u"fl", u"fr", u"ch", u"ll"};
 
+// Legal syllable start: one consonant or fewer, or a stop/f + l/r cluster, ch, or ll.
 bool valid_onset(const std::u16string& s) {
     return s.size() <= 1 || std::find(kOnsetClusters.begin(), kOnsetClusters.end(), s) != kOnsetClusters.end();
 }
@@ -249,6 +268,7 @@ bool valid_medial_coda(const std::u16string& s) {
 // A word can end in one consonant: native endings ("otan", "reloj") and loanwords ("álbum", "robot", "club").
 bool valid_final_coda(const std::u16string& s) { return s.size() <= 1; }
 
+// True when the consonants between vowels split into a medial coda plus a legal onset.
 bool valid_medial(const std::u16string& s) {
     for (size_t split = 0; split <= std::min<size_t>(2, s.size() - 1); ++split) {
         if (valid_medial_coda(s.substr(0, split)) && valid_onset(s.substr(split))) return true;
@@ -313,6 +333,7 @@ std::vector<Unit*> flatten(std::vector<Segment>& segments) {
     return flat;
 }
 
+// True when unit.kind is one of kinds.
 bool kind_in(const Unit& u, std::initializer_list<Kind> kinds) {
     return std::find(kinds.begin(), kinds.end(), u.kind) != kinds.end();
 }
@@ -329,6 +350,7 @@ std::u16string allophone(const Unit& prev, const Unit& unit, const Unit& next) {
     return unit.ipa;
 }
 
+// Applies contextual allophones across the utterance, including across word boundaries.
 void apply_allophones(std::vector<Segment>& segments) {
     const std::vector<Unit*> flat = flatten(segments);
     std::vector<std::u16string> replaced(flat.size());
@@ -344,6 +366,7 @@ void apply_allophones(std::vector<Segment>& segments) {
 const std::array<std::pair<std::u16string, std::u16string>, 4> kDiphthongs = {
     {{u"aɪ", u"I"}, {u"aʊ", u"W"}, {u"eɪ", u"A"}, {u"oʊ", u"O"}}};
 
+// Swaps each espeak-ng falling diphthong in kDiphthongs for Kokoro's single symbol.
 std::u16string merge_diphthongs(std::u16string text) {
     for (const auto& [from, to] : kDiphthongs) {
         for (size_t pos = text.find(from); pos != std::u16string::npos; pos = text.find(from, pos)) {
@@ -353,6 +376,7 @@ std::u16string merge_diphthongs(std::u16string text) {
     return text;
 }
 
+// A Word becomes its phonemes, with ˈ before the stressed vowel. Punct and Space return text unchanged.
 std::u16string render_segment(const Segment& segment) {
     if (segment.type != SegmentType::Word) return segment.text;
     std::u16string out;
