@@ -7,6 +7,10 @@
 // ASCII and Spanish capitals (ÁÉÍÓÚÜÑ) to lowercase. Other characters are unchanged.
 char16_t spanish_to_lower(char16_t c);
 
+// Grave-accented vowels (àèìòù, either case) to the plain vowel of the same case, as Spanish has no grave accent
+// ("déjà vu", "à la carte"). Other characters are unchanged.
+char16_t fold_grave(char16_t c);
+
 // Loanwords Spanish speakers pronounce differently from their spelling, mapped to a lowercase respelling in Spanish
 // orthography that the Spanish G2P reads instead: a written accent marks stress, and IPA consonants missing from
 // Spanish spelling are written directly ("show" -> "ʃóu").

@@ -18,9 +18,9 @@ const std::unordered_map<std::u16string, std::u16string> kBuiltin = {
     {u"facebook", u"féisbuk"},
 };
 
-// Lowercases text with spanish_to_lower.
+// Lowercases text with spanish_to_lower after fold_grave.
 std::u16string lowercase(std::u16string text) {
-    std::transform(text.begin(), text.end(), text.begin(), spanish_to_lower);
+    std::transform(text.begin(), text.end(), text.begin(), [](char16_t c) { return spanish_to_lower(fold_grave(c)); });
     return text;
 }
 
@@ -48,6 +48,13 @@ char16_t spanish_to_lower(char16_t c) {
     if (c >= u'A' && c <= u'Z') return static_cast<char16_t>(c + 32);
     if (std::u16string_view(u"ÁÉÍÓÚÜÑ").find(c) != std::u16string_view::npos) return static_cast<char16_t>(c + 0x20);
     return c;
+}
+
+char16_t fold_grave(char16_t c) {
+    static constexpr std::u16string_view grave = u"àèìòùÀÈÌÒÙ";
+    static constexpr std::u16string_view plain = u"aeiouAEIOU";
+    const size_t i = grave.find(c);
+    return i == std::u16string_view::npos ? c : plain[i];
 }
 
 const SpanishLoanwords& SpanishLoanwords::builtin() {

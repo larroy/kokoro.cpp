@@ -59,9 +59,10 @@ void push_space(std::vector<Segment>& segments) {
     if (segments.empty() || segments.back().type != SegmentType::Space) segments.push_back({SegmentType::Space, u" "});
 }
 
-// Appends raw: extends the open Word (tracking all_caps), emits one Punct, or collapses a separator into Space.
-// Anything else is dropped.
-void push_char(std::vector<Segment>& segments, char16_t raw) {
+// Appends input with grave accents folded: extends the open Word (tracking all_caps), emits one Punct, or collapses
+// a separator into Space. Anything else is dropped.
+void push_char(std::vector<Segment>& segments, char16_t input) {
+    const char16_t raw = fold_grave(input);
     const char16_t c = spanish_to_lower(raw);
     if (is_letter(c)) {
         if (segments.empty() || segments.back().type != SegmentType::Word) segments.push_back({SegmentType::Word, u""});
