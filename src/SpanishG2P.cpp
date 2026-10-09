@@ -11,13 +11,14 @@ namespace {
 
 enum class Kind { Vowel, Nasal, Lateral, Rhotic, Other, Pause };
 
+// One phonetic token: an IPA symbol (empty for a pause) plus the flags used for diphthongs, stress, and allophones.
 struct Unit {
-    std::u16string ipa;
+    std::u16string ipa;     // current symbol; later rewritten as a glide, offglide, or allophone
     Kind kind = Kind::Other;
-    bool accented = false;
-    bool weak = false;
+    bool accented = false;  // written accent (áéíóú); that nucleus is stressed
+    bool weak = false;      // i/u, or vowel y, that may join a neighboring vowel
     bool syllabic = false;  // weak vowel that never joins a diphthong (ü, u/i after r or ʎ)
-    bool stressed = false;
+    bool stressed = false;  // nucleus that receives the ˈ mark when the word is rendered
 };
 
 enum class SegmentType { Word, Punct, Space };
