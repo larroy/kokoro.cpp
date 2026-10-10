@@ -1,9 +1,9 @@
 # Kokoro C++ Inference
 [![CI](https://github.com/larroy/kokoro.cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/larroy/kokoro.cpp/actions/workflows/ci.yml)
 
-English | [中文](#kokoro-c-推理) | [Español](#kokoro-c-inferencia)
+English | [中文](#kokoro-c-推理) | [Español](#kokoro-c-inferencia) | [Deutsch](#kokoro-c-inferenz)
 
-A high-performance, lightweight C++ inference implementation of the [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS model, built on ONNX Runtime. The project currently supports mixed **Chinese and English** synthesis, and **Spanish** with the Kokoro-82M v1.0 model.
+A high-performance, lightweight C++ inference implementation of the [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS model, built on ONNX Runtime. The project currently supports mixed **Chinese and English** synthesis, **Spanish** with the Kokoro-82M v1.0 model, and **German** with a German fine-tune.
 
 ## Features
 
@@ -90,6 +90,7 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 | `-o, --output <path>` | output WAV file (default: `output.wav`) |
 | `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
 | `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
+| `-i, --interactive` | read phrases from stdin and play each one as soon as it is synthesized (`-o` is unused) |
 | `--list-voices` | print the available voices |
 
 To add your own voices (blends, imported `.pt` tensors), see [docs/adding-voices.md](docs/adding-voices.md).
@@ -121,6 +122,15 @@ German (voices `df_eva`, `df_victoria`, `dm_bernd`, `dm_martin`; `df_*`/`dm_*` v
     "Guten Tag, wie geht es dir?"
 ./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin --language de --phonemize "Ich habe 1.000 Euro."
 # ɪç hɑːbə ˈIntWzənt ˈɔørɔ.
+```
+
+### Interactive mode
+
+`-i` reads phrases from the terminal and plays each one as soon as it is synthesized. While it runs, `/voice [name]`,
+`/speed [rate]` and `/voices` change or show the settings, `/help` lists the commands and `/quit` exits:
+
+```bash
+./build/kokoro -v af_maple -i
 ```
 
 Output is a mono 32-bit float WAV at 24 kHz. Exit status is 0 on success, 1 on a library error, and 2 on a usage error.
@@ -217,7 +227,7 @@ accent on the stressed vowel; sounds Spanish spelling lacks are written as IPA (
 - `dotnet/`, `packaging/`: .NET wrapper (`Larroy.Kokoro`) and the scripts that build its NuGet packages.
 - `docs/`: guides ([adding voices](docs/adding-voices.md), [thread safety](docs/thread-safety.md)).
 - `scripts/`: helper scripts for data processing.
-- `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights).
+- `dict/`: G2P dictionary files (Jieba, pinyin, CMU, g2p_en weights, German MFA dictionary, g2p_de weights).
 
 ## License
 
@@ -227,9 +237,9 @@ MIT
 
 # Kokoro C++ 推理
 
-[English](#kokoro-c-inference) | 中文 | [Español](#kokoro-c-inferencia)
+[English](#kokoro-c-inference) | 中文 | [Español](#kokoro-c-inferencia) | [Deutsch](#kokoro-c-inferenz)
 
-基于 ONNX Runtime 的 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS 模型的高性能轻量级 C++ 推理实现。本项目目前支持**中英文**混合合成，并可使用 Kokoro-82M v1.0 模型合成**西班牙语**。
+基于 ONNX Runtime 的 [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS 模型的高性能轻量级 C++ 推理实现。本项目目前支持**中英文**混合合成，可使用 Kokoro-82M v1.0 模型合成**西班牙语**，并可使用德语微调模型合成**德语**。
 
 ## 特性
 
@@ -316,6 +326,7 @@ Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` �
 | `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
 | `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
 | `--phonemize` | 输出 `<文本>` 的音素而不合成 |
+| `-i, --interactive` | 从标准输入读取句子，每句合成后立即播放（不使用 `-o`） |
 | `--list-voices` | 列出可用语音 |
 
 如需添加自定义语音（混合语音、导入 `.pt` 张量），请参阅 [docs/adding-voices.md](docs/adding-voices.md)（英文）。
@@ -344,6 +355,14 @@ Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` �
     "Guten Tag, wie geht es dir?"
 ./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin --language de --phonemize "Ich habe 1.000 Euro."
 # ɪç hɑːbə ˈIntWzənt ˈɔørɔ.
+```
+
+### 交互模式
+
+`-i` 从终端读取句子，每句合成后立即播放。运行期间可用 `/voice [名称]`、`/speed [语速]` 和 `/voices` 查看或修改设置，`/help` 列出命令，`/quit` 退出：
+
+```bash
+./build/kokoro -v zf_002 -i
 ```
 
 输出为 24 kHz 单声道 32 位浮点 WAV。成功时退出码为 0，库错误为 1，用法错误为 2。
@@ -432,7 +451,7 @@ python scripts/export_g2p.py checkpoint20.npz dict/g2p_en.weights
 - `dotnet/`, `packaging/`: .NET 封装（`Larroy.Kokoro`）及构建其 NuGet 包的脚本。
 - `docs/`: 使用指南（[添加语音](docs/adding-voices.md)、[线程安全](docs/thread-safety.md)（英文））。
 - `scripts/`: 数据处理辅助脚本。
-- `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重）。
+- `dict/`: G2P 字典文件（Jieba、拼音、CMU、g2p_en 权重、德语 MFA 词典、g2p_de 权重）。
 
 ## 许可证
 
@@ -442,9 +461,9 @@ MIT
 
 # Kokoro C++: inferencia
 
-[English](#kokoro-c-inference) | [中文](#kokoro-c-推理) | Español
+[English](#kokoro-c-inference) | [中文](#kokoro-c-推理) | Español | [Deutsch](#kokoro-c-inferenz)
 
-Implementación ligera y de alto rendimiento en C++ de la inferencia del modelo TTS [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), basada en ONNX Runtime. El proyecto admite síntesis mixta en **chino e inglés** y, con el modelo Kokoro-82M v1.0, en **español**.
+Implementación ligera y de alto rendimiento en C++ de la inferencia del modelo TTS [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), basada en ONNX Runtime. El proyecto admite síntesis mixta en **chino e inglés**, en **español** con el modelo Kokoro-82M v1.0 y en **alemán** con un modelo afinado para alemán.
 
 ## Características
 
@@ -531,6 +550,7 @@ Ejecuta la herramienta `kokoro` desde la raíz del proyecto (las rutas por defec
 | `-o, --output <ruta>` | archivo WAV de salida (por defecto: `output.wav`) |
 | `-p, --phonemes` | `<texto>` es una cadena de fonemas; omite el G2P |
 | `--phonemize` | imprime los fonemas de `<texto>` en lugar de sintetizar |
+| `-i, --interactive` | lee frases de la entrada estándar y reproduce cada una en cuanto se sintetiza (no usa `-o`) |
 | `--list-voices` | imprime las voces disponibles |
 
 Para añadir voces propias (mezclas, tensores `.pt` importados), consulta [docs/adding-voices.md](docs/adding-voices.md) (en inglés).
@@ -563,6 +583,15 @@ Chino e inglés:
 ```bash
 ./build/kokoro -o hello.wav "Hello world"
 ./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
+```
+
+### Modo interactivo
+
+`-i` lee frases desde el terminal y reproduce cada una en cuanto se sintetiza. Mientras se ejecuta, `/voice [nombre]`,
+`/speed [factor]` y `/voices` muestran o cambian los ajustes, `/help` lista las órdenes y `/quit` sale:
+
+```bash
+./build/kokoro -m models/kokoro-v1.0.onnx --voices models/voices-v1.0-es.bin -v ef_dora -i
 ```
 
 La salida es un WAV mono de 32 bits en coma flotante a 24 kHz. El código de salida es 0 si todo va bien, 1 ante un error de la biblioteca y 2 ante un error de uso.
@@ -667,8 +696,260 @@ python scripts/export_g2p.py checkpoint20.npz dict/g2p_en.weights
 - `dotnet/`, `packaging/`: wrapper de .NET (`Larroy.Kokoro`) y los scripts que generan sus paquetes NuGet.
 - `docs/`: guías ([añadir voces](docs/adding-voices.md), [seguridad entre hilos](docs/thread-safety.md) (en inglés)).
 - `scripts/`: scripts auxiliares de procesamiento de datos.
-- `dict/`: diccionarios del G2P (Jieba, pinyin, CMU, pesos de g2p_en).
+- `dict/`: diccionarios del G2P (Jieba, pinyin, CMU, pesos de g2p_en, diccionario MFA alemán, pesos de g2p_de).
 
 ## Licencia
+
+MIT
+
+---
+
+# Kokoro C++: Inferenz
+
+[English](#kokoro-c-inference) | [中文](#kokoro-c-推理) | [Español](#kokoro-c-inferencia) | Deutsch
+
+Eine schnelle, schlanke C++-Implementierung der Inferenz des TTS-Modells [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) auf Basis von ONNX Runtime. Das Projekt unterstützt gemischte Synthese in **Chinesisch und Englisch**, **Spanisch** mit dem Modell Kokoro-82M v1.0 und **Deutsch** mit einem auf Deutsch feinabgestimmten Modell.
+
+## Funktionen
+
+- 🚀 **Schnelle Inferenz**: basiert auf ONNX Runtime.
+- 🌏 **Mehrsprachig**: native Unterstützung für Chinesisch und Englisch; Spanisch (Kastilisch) mit dem v1.0-Modell; Deutsch mit einem deutschen Fine-Tune.
+
+## Voraussetzungen
+
+- **CMake** (3.15+)
+- **Ninja** (empfohlen; `uv run bootstrap.py build` verwendet es, wenn es im `PATH` liegt)
+- **C++-Compiler** (mit C++17-Unterstützung)
+- **[uv](https://docs.astral.sh/uv/)**: führt `bootstrap.py` und `voice_tool.py` aus und installiert beim ersten Aufruf ihre Python-Abhängigkeiten (Python 3.10+, click) in `.venv`
+
+## Einrichtung
+
+```bash
+uv run bootstrap.py configure
+```
+
+Lädt herunter und prüft dabei die SHA-256-Prüfsummen:
+
+- das vorkompilierte [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU; auf unterstützten NVIDIA-GPUs die CUDA-Variante, siehe unten) für die aktuelle Plattform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) nach `third_party/onnxruntime/`;
+- das Modell `kokoro-v1.1-zh.onnx` und das Stimmenpaket `voices-v1.1-zh.bin` aus dem [Release `voices_model_files`](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) dieses Repositorys nach `models/`;
+- das Modell Kokoro-82M v1.0 `kokoro-v1.0.onnx` von [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) und die spanischen Stimmen `ef_dora`, `em_alex` und `em_santa` von [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), gepackt in `models/voices-v1.0-es.bin`;
+- das deutsche Fine-Tune `kokoro-de.onnx` von [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin) und die deutschen Stimmen `df_eva`, `df_victoria`, `dm_bernd` und `dm_martin` von [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF), gepackt in `models/voices-de.bin`.
+
+Bereits vorhandene, aktuelle Dateien werden übersprungen; `--force` lädt sie erneut herunter. Die ONNX-Runtime-Version und die Prüfsummen sind in `bootstrap.py` festgelegt. Um eine andere ONNX-Runtime-Installation zu verwenden, `configure` auslassen und CMake `-DONNXRUNTIME_ROOT=/pfad/zu/onnxruntime` übergeben.
+
+## Kompilieren
+
+```bash
+uv run bootstrap.py build
+```
+
+`build` führt die CMake-Schritte Konfigurieren und Bauen mit dem Ninja-Generator aus. Liegt `ninja` nicht im `PATH`, gibt es eine Warnung aus und fällt auf den Standardgenerator von CMake zurück; ein `-G` nach `--` legt den Generator selbst fest. Optionen: `--build-dir` (Standard `build`), `--config` (`Debug`, `Release`, `RelWithDebInfo`, `MinSizeRel`; Standard `Release`), `-j/--jobs`. Argumente nach `--` gehen an den CMake-Konfigurationsschritt, z. B. `uv run bootstrap.py build -- -DKOKORO_BUILD_TESTS=OFF`. Ein Build-Verzeichnis kann den Generator nicht wechseln: Wurde es mit einem anderen konfiguriert, zuerst löschen. Unter Windows braucht Ninja die MSVC-Umgebung (aus einer Developer Command Prompt starten). Entspricht:
+
+```bash
+cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+```
+
+Erzeugt die gemeinsame Bibliothek `kokoro` (`kokoro.dll` / `libkokoro.so` / `libkokoro.dylib`) und das Kommandozeilenwerkzeug `kokoro`. `libkokoro` linkt gegen die gemeinsame Bibliothek von ONNX Runtime. Unter Linux/macOS findet der Build-Baum sie über den rpath; installierte Kopien müssen sie zur Laufzeit finden können. Unter Windows wird `onnxruntime.dll` neben `kokoro.dll` kopiert (und mit ihr installiert).
+
+### CUDA (experimentell)
+
+Die CUDA-Unterstützung ist experimentell. `uv run bootstrap.py configure` verwendet die vorkompilierte CUDA-Variante von ONNX Runtime, wenn es eine unterstützte NVIDIA-GPU erkennt (Windows x64: sm 7.5, 8.6, 8.9 plus PTX 9.0; Linux x64: sm 6.0, 7.0, 7.5, 8.0 plus PTX 9.0) und der NVIDIA-Treiber CUDA 12.8 oder neuer unterstützt; `--ort cpu` oder `--ort gpu` erzwingt ein Paket. Für andere GPUs ONNX Runtime mit CUDA aus dem Quellcode bauen:
+
+```bash
+uv run bootstrap.py build-ort   # braucht CMake 3.28+, git, ein CUDA-12-Toolkit und cuDNN 9 für CUDA 12
+```
+
+`build-ort` findet das CUDA-Toolkit über die Umgebungsvariablen `CUDA_HOME` oder `CUDA_PATH` (der CUDA-Installer setzt `CUDA_PATH`, z. B. `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9` unter Windows), über `nvcc` im `PATH` oder an den Standardorten (`C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.*`, `/usr/local/cuda`); `--cuda-home` gibt ein Toolkit ausdrücklich an. cuDNN wird über `CUDNN_HOME` oder `CUDNN_PATH` gefunden (`--cudnn-home`; das Archiv von https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/ verwenden, nicht das Installer-Layout). Das Ergebnis ersetzt das vorkompilierte Paket in `third_party/onnxruntime/`.
+
+Zur Laufzeit müssen die Bibliotheken von CUDA 12 und cuDNN 9 ladbar sein: unter Windows im `PATH` (`cudart64_12.dll`, `cublas64_12.dll`, `cublasLt64_12.dll`, `curand64_10.dll`, `cufft64_11.dll`, `cudnn64_9.dll`), unter Linux im `LD_LIBRARY_PATH` (`libcudart.so.12`, `libcublas.so.12`, `libcublasLt.so.12`, `libcurand.so.10`, `libcufft.so.11`, `libcudnn.so.9`); fehlen sie, gibt kokoro eine Warnung aus und rechnet auf der CPU. Das Inferenzgerät wählen `--device auto|cpu|cuda` und `--gpu-id`; mit `auto` fällt ein fehlgeschlagener CUDA-Start auf die CPU zurück, mit `cuda` ist er ein Fehler.
+
+### Tests
+
+```bash
+ctest --test-dir build -C Release --output-on-failure
+```
+
+Die Tests liegen in `tests/` (doctest, mitgeliefert in `third_party/doctest`): `c_api` prüft die C-API ohne Modell, `g2p` legt die G2P-Ausgabe fest, und `synthesis`, `synthesis_es` und `synthesis_de` führen die echten Modelle aus `models/` aus (übersprungen, wenn Modell oder Stimmendatei fehlen). Mit `-DKOKORO_BUILD_TESTS=OFF` konfigurieren, um sie nicht zu bauen.
+
+Die Python-Werkzeuge haben eigene Tests in `tests/python/`: `uv run pytest` ausführen. Die `.pt`-Importtests werden übersprungen, solange PyTorch nicht installiert ist; `uv run --group voice pytest` führt sie mit aus.
+
+## Verwendung / Demo
+
+Das Kommandozeilenwerkzeug `kokoro` im Projektstamm ausführen (die Standardpfade zeigen auf `models/` und `dict/`). Mit Visual Studio oder einem anderen Multi-Config-Generator liegt die ausführbare Datei in `build/Release/`.
+
+```bash
+./build/kokoro [Optionen] <Text>
+./build/kokoro --list-voices
+```
+
+| Option | Bedeutung |
+|---|---|
+| `-m, --model <Pfad>` | ONNX-Modelldatei (Standard: `models/kokoro-v1.1-zh.onnx`) |
+| `--voices <Pfad>` | Stimmendatei (Standard: `models/voices-v1.1-zh.bin`) |
+| `-d, --dict <Verz.>` | Wörterbuchverzeichnis (Standard: `dict`) |
+| `-v, --voice <Name>` | Stimme (Standard: `af_maple`); englisch: `af_maple`, `af_sol`, `bf_vale`; chinesisch: `zf_*`, `zm_*`; spanisch (Modell v1.0): `ef_dora`, `em_alex`, `em_santa`; deutsch (Modell `kokoro-de.onnx`): `df_eva`, `df_victoria`, `dm_bernd`, `dm_martin` |
+| `-s, --speed <Faktor>` | Sprechgeschwindigkeit, > 0 (Standard: `1.0`) |
+| `--lang <auto\|en\|zh\|es\|de>` | Sprache, in der Zahlen gelesen werden (Standard: `auto`) |
+| `--language <auto\|zh\|en\|es\|de>` | Sprache des Textes; `auto`: Spanisch für `ef_*`/`em_*`, Deutsch für `df_*`/`dm_*`, Englisch für `af_`/`am_`/`bf_`/`bm_*`, sonst Chinesisch/Englisch (Standard: `auto`) |
+| `-o, --output <Pfad>` | WAV-Ausgabedatei (Standard: `output.wav`) |
+| `-p, --phonemes` | `<Text>` ist eine Phonemfolge; G2P wird übersprungen |
+| `--phonemize` | gibt die Phoneme von `<Text>` aus, statt zu synthetisieren |
+| `-i, --interactive` | liest Sätze von der Standardeingabe und spielt jeden ab, sobald er synthetisiert ist (`-o` wird nicht verwendet) |
+| `--list-voices` | listet die verfügbaren Stimmen auf |
+
+Eigene Stimmen hinzufügen (Mischungen, importierte `.pt`-Tensoren): siehe [docs/adding-voices.md](docs/adding-voices.md) (auf Englisch).
+
+### Beispiele
+
+Deutsch (Phoneme in der `de`-Konvention von espeak-ng; die Stimmen `df_*`/`dm_*` wählen den deutschen G2P automatisch):
+
+```bash
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin --list-voices
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin -v dm_martin -o hallo.wav \
+    "Guten Tag, wie geht es dir?"
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin -v df_eva -s 0.9 -o nachricht.wav \
+    "Der Zug hat leider zwanzig Minuten Verspätung."
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin --language de --phonemize "Ich habe 1.000 Euro."
+# ɪç hɑːbə ˈIntWzənt ˈɔørɔ.
+```
+
+Spanisch (die Stimmen `ef_*`/`em_*` wählen den spanischen G2P automatisch):
+
+```bash
+./build/kokoro -m models/kokoro-v1.0.onnx --voices models/voices-v1.0-es.bin -v ef_dora -o hola.wav \
+    "Hola, ¿cómo estás? Tengo 25 años."
+```
+
+Chinesisch und Englisch:
+
+```bash
+./build/kokoro -o hello.wav "Hello world"
+./build/kokoro --voice zf_002 "你好啊，这是一个测试。Hello world"
+```
+
+### Interaktiver Modus
+
+`-i` liest Sätze vom Terminal und spielt jeden ab, sobald er synthetisiert ist. Während des Laufs zeigen oder ändern
+`/voice [Name]`, `/speed [Faktor]` und `/voices` die Einstellungen, `/help` listet die Befehle auf und `/quit` beendet:
+
+```bash
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin -v df_victoria -i
+```
+
+Die Ausgabe ist eine Mono-WAV-Datei mit 32-Bit-Gleitkommawerten bei 24 kHz. Der Exit-Code ist 0 bei Erfolg, 1 bei einem Bibliotheksfehler und 2 bei einem Bedienungsfehler.
+
+## Bibliothek
+
+`libkokoro` stellt in [`include/kokoro/kokoro.h`](include/kokoro/kokoro.h) eine C-API bereit, nutzbar aus C, C++ oder jeder Sprache mit C-FFI (Python `ctypes`, C#, Rust, Go, ...):
+
+```c
+#include <kokoro/kokoro.h>
+
+kokoro_ctx* ctx = NULL;
+if (kokoro_create("models/kokoro-de.onnx", "models/voices-de.bin", "dict", &ctx) != KOKORO_OK) {
+    fprintf(stderr, "%s\n", kokoro_last_error());
+    return 1;
+}
+kokoro_audio audio;
+if (kokoro_synthesize(ctx, "Guten Tag, wie geht es dir?", "dm_martin", 1.0f, 0, &audio) == KOKORO_OK) {
+    /* audio.samples: Mono-PCM als float, audio.num_samples Samples bei audio.sample_rate Hz */
+    kokoro_audio_free(&audio);
+}
+kokoro_destroy(ctx);
+```
+
+- Alle Zeichenketten, auch Pfade, sind UTF-8. `dict_dir` ist das Verzeichnis mit `vocab.txt` und den G2P-Wörterbüchern (`dict/` in diesem Repository).
+- Fehler werden als `kokoro_status`-Codes gemeldet; `kokoro_last_error()` liefert die Meldung des aufrufenden Threads.
+- `kokoro_voice_count` / `kokoro_voice_name` zählen die Stimmen auf, `kokoro_phonemize` liefert die Phonemfolge, und `KOKORO_INPUT_PHONEMES` synthetisiert Phoneme direkt.
+- `kokoro_set_language(ctx, KOKORO_LANGUAGE_GERMAN)` erzwingt den deutschen G2P (auch für `kokoro_phonemize`, das keine Stimme erhält); `kokoro_set_number_language` legt fest, wie Zahlen gelesen werden.
+- Verschiedene Kontexte dürfen aus verschiedenen Threads verwendet werden; ein einzelner Kontext darf nicht gleichzeitig verwendet werden.
+
+Installieren und aus CMake verwenden:
+
+```bash
+cmake --install build --config Release --prefix /pfad/zum/prefix
+```
+
+```cmake
+find_package(kokoro REQUIRED)   # mit CMAKE_PREFIX_PATH=/pfad/zum/prefix
+target_link_libraries(app PRIVATE kokoro::kokoro)
+```
+
+Alternativ `add_subdirectory(kokoro.cpp)` und gegen `kokoro::kokoro` linken.
+
+### .NET (NuGet)
+
+`Larroy.Kokoro` kapselt die C-API für .NET 8 und .NET 10 (`dotnet/`); seine Runtime-Pakete bringen `kokoro.dll` für win-x64 und win-arm64 mit und beziehen ONNX Runtime aus dem Paket `Microsoft.ML.OnnxRuntime`, und `Larroy.Kokoro.runtime.win-x64.cuda` ergänzt CUDA über `Microsoft.ML.OnnxRuntime.Gpu.Windows`. Die Verwendung beschreibt [`packaging/README.md`](packaging/README.md). Zum Bauen der Pakete unter Windows (braucht VS 2022 mit den C++-Werkzeugen für x64 und ARM64, `nuget.exe` und das .NET SDK):
+
+```powershell
+./packaging/build-natives.ps1                   # kokoro.dll pro RID -> artifacts/natives/<rid>/
+dotnet test dotnet/Kokoro.Net.sln -c Release
+./packaging/pack.ps1                            # -> artifacts/nuget/*.nupkg
+./packaging/smoke.ps1 -Framework net8.0         # End-to-End-Prüfung gegen den lokalen Feed
+```
+
+Den interaktiven Modus gibt es auch als .NET-Beispiel (`dotnet/examples/Kokoro.Interactive/`, von der obigen Solution
+gebaut, nicht in den NuGet-Paketen enthalten):
+
+```powershell
+dotnet run --project dotnet/examples/Kokoro.Interactive -c Release -- --device cpu
+```
+
+## Deutscher G2P
+
+`src/german/` wandelt deutsche Wörter in dieser Reihenfolge in Phoneme um:
+
+1. `dict/german_mfa.dict`: das German MFA dictionary v3.0.0 (CC BY 4.0, über [g2p_de](https://github.com/gooofy/g2p_de)). Von mehreren Varianten eines Wortes gilt die längste, weil das Wörterbuch umgangssprachliche Verkürzungen zuerst aufführt.
+2. Komposita werden in Wörterbuchwörter von mindestens drei Buchstaben zerlegt, auch mit Fugen-s (`Fahrradschlosskette` → `Fahrrad` + `Schloss` + `Kette`).
+3. Alle übrigen Wörter sagt das neuronale Netz `dict/g2p_de.weights` voraus, portiert von [g2p_de](https://github.com/gooofy/g2p_de) (Apache-2.0, siehe `dict/g2p_de.LICENSE.txt`).
+
+Die MFA-Phoneme werden in die `de`-Konvention von espeak-ng übertragen, mit der die deutschen Modelle trainiert wurden: Diphthonge `I`, `W`, `ɔø`, vokalisiertes r, Auslautverhärtung und eine Betonung nach Regeln (Stammsilbe; unbetonte Präfixe wie `be-`, `ge-`, `ver-`, `er-`; betonte Suffixe wie `-ieren`, `-ion`, `-ität`, `-ei`). Zahlen werden auf Deutsch gelesen (`21` → `einundzwanzig`), deutsche Schreibweisen wie `1.000` und `3,5` werden erkannt, und `z. B.` und `d. h.` werden ausgeschrieben.
+
+Die Auswertung gegen espeak-ng läuft über einen Korpus (`eval_bench/corpus/de.txt`):
+
+```bash
+uv run --group eval python eval_bench/compare_g2p.py --language de
+```
+
+Braucht ein gebautes `g2p_dump` (`uv run bootstrap.py build`). Endet mit Code 1, wenn es Abweichungen gibt, die nicht in `eval_bench/corpus/de_known_diffs.tsv` stehen.
+
+`g2p_de.weights` wird aus `checkpoint_de.npz` von g2p_de erzeugt (ohne numpy):
+
+```bash
+python scripts/export_g2p.py checkpoint_de.npz dict/g2p_de.weights
+```
+
+## Englischer G2P
+
+Englische Wörter werden in dieser Reihenfolge in Phoneme umgewandelt (die Ausgabe verwendet den englischen Phonemsatz von Kokoro/misaki):
+
+1. `dict/user_en.dict`: Benutzerwörterbuch im CMU-Format (`WORT ARPAbet-Phoneme`, z. B. `onnx AA1 N IH0 K S`). Höchste Priorität; gedacht für Eigennamen.
+2. `dict/cmudict-0.7b/cmudict.dict`: das CMU Pronouncing Dictionary.
+3. Wörter in Großbuchstaben mit höchstens 5 Buchstaben (z. B. `GPU`) werden mit den englischen Buchstabennamen buchstabiert.
+4. Alle übrigen unbekannten Wörter sagt das neuronale Netz `dict/g2p_en.weights` voraus, portiert von [g2p_en](https://github.com/Kyubyong/g2p) (Apache-2.0, siehe `dict/g2p_en.LICENSE.txt`).
+
+`g2p_en.weights` wird aus `checkpoint20.npz` von g2p_en erzeugt (ohne numpy):
+
+```bash
+python scripts/export_g2p.py checkpoint20.npz dict/g2p_en.weights
+```
+
+## Projektstruktur
+
+- `include/kokoro/kokoro.h`, `src/kokoro_c.cpp`: öffentliche C-API von `libkokoro`.
+- `src/cli/main.cpp`: das Kommandozeilenwerkzeug `kokoro`.
+- `src/Kokoro.cpp/h`: zentrale TTS-Klasse (intern).
+- `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: englischer G2P (Wörterbuchsuche und neuronale Vorhersage).
+- `src/SpanishG2P.cpp/h`: regelbasierter spanischer G2P (`es`-Konvention von espeak-ng).
+- `src/german/`: deutscher G2P (MFA-Wörterbuch, Kompositazerlegung, neuronales g2p_de als Rückfall; `de`-Konvention von espeak-ng).
+- `eval_bench/`: G2P-Auswertung gegen espeak-ng (`g2p_dump`, `compare_g2p.py`, Korpora).
+- `tests/`: Bibliothekstests (mit `ctest`); `tests/python/`: Tests der Python-Werkzeuge (mit `uv run pytest`).
+- `dotnet/`, `packaging/`: .NET-Wrapper (`Larroy.Kokoro`) und die Skripte, die seine NuGet-Pakete bauen.
+- `docs/`: Anleitungen ([Stimmen hinzufügen](docs/adding-voices.md), [Thread-Sicherheit](docs/thread-safety.md) (auf Englisch)).
+- `scripts/`: Hilfsskripte zur Datenverarbeitung.
+- `dict/`: G2P-Wörterbücher (Jieba, Pinyin, CMU, g2p_en-Gewichte, German MFA dictionary, g2p_de-Gewichte).
+
+## Lizenz
 
 MIT
