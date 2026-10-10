@@ -110,7 +110,7 @@ public sealed class KokoroContext : IDisposable
 
     /// <summary>
     /// Sets the G2P language for later synthesize/phonemize calls. Default: Auto. A number language other than
-    /// <see cref="KokoroNumberLanguage.Auto"/> also applies to Spanish text.
+    /// <see cref="KokoroNumberLanguage.Auto"/> also applies to Spanish and English text.
     /// </summary>
     /// <param name="language">G2P language.</param>
     /// <exception cref="KokoroException">The value was rejected.</exception>

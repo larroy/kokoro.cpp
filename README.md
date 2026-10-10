@@ -85,7 +85,7 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 | `-v, --voice <name>` | voice (default: `af_maple`); English voices: `af_maple`, `af_sol`, `bf_vale`; Chinese voices: `zf_*`, `zm_*` |
 | `-s, --speed <rate>` | speaking rate, > 0 (default: `1.0`) |
 | `--lang <auto\|en\|zh\|es>` | language for reading numbers (default: `auto`) |
-| `--language <auto\|es>` | text language; `auto`: Spanish for `ef_*`/`em_*` voices, else Chinese/English (default: `auto`) |
+| `--language <auto\|zh\|en\|es>` | text language; `auto`: `es` for `ef_*`/`em_*`, `en` for `af_`/`am_`/`bf_`/`bm_*` voices, else `zh` (Chinese/English) (default: `auto`) |
 | `-o, --output <path>` | output WAV file (default: `output.wav`) |
 | `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
 | `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
@@ -300,7 +300,7 @@ Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` �
 | `-v, --voice <名称>` | 语音（默认：`af_maple`）；英文语音：`af_maple`、`af_sol`、`bf_vale`；中文语音：`zf_*`、`zm_*` |
 | `-s, --speed <语速>` | 语速，须 > 0（默认：`1.0`） |
 | `--lang <auto\|en\|zh\|es>` | 数字朗读语言（默认：`auto`） |
-| `--language <auto\|es>` | 文本语言；`auto`：`ef_*`/`em_*` 语音用西班牙语，否则中文/英文（默认：`auto`） |
+| `--language <auto\|zh\|en\|es>` | 文本语言；`auto`：`ef_*`/`em_*` 语音用西班牙语，`af_`/`am_`/`bf_`/`bm_*` 语音用英语，否则中文/英文（默认：`auto`） |
 | `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
 | `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
 | `--phonemize` | 输出 `<文本>` 的音素而不合成 |
@@ -504,7 +504,7 @@ Ejecuta la herramienta `kokoro` desde la raíz del proyecto (las rutas por defec
 | `-v, --voice <nombre>` | voz (por defecto: `af_maple`); voces inglesas: `af_maple`, `af_sol`, `bf_vale`; chinas: `zf_*`, `zm_*`; españolas (modelo v1.0): `ef_dora`, `em_alex`, `em_santa` |
 | `-s, --speed <factor>` | velocidad del habla, > 0 (por defecto: `1.0`) |
 | `--lang <auto\|en\|zh\|es>` | idioma para leer los números (por defecto: `auto`) |
-| `--language <auto\|es>` | idioma del texto; `auto`: español para las voces `ef_*`/`em_*`, si no chino/inglés (por defecto: `auto`) |
+| `--language <auto\|zh\|en\|es>` | idioma del texto; `auto`: español para las voces `ef_*`/`em_*`, inglés para `af_`/`am_`/`bf_`/`bm_*`, si no chino/inglés (por defecto: `auto`) |
 | `-o, --output <ruta>` | archivo WAV de salida (por defecto: `output.wav`) |
 | `-p, --phonemes` | `<texto>` es una cadena de fonemas; omite el G2P |
 | `--phonemize` | imprime los fonemas de `<texto>` en lugar de sintetizar |

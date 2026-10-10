@@ -6,7 +6,7 @@
 #include <utility>
 #include "Utils.h"
 #include "ZHFrontend.h"
-#include "EnG2P.h"
+#include "english/EnG2P.h"
 #include "NumberNormalizer.h"
 
 // ZHG2P: grapheme-to-phoneme frontend for mixed Chinese/English text.
@@ -39,15 +39,10 @@ public:
     //          "1.1" 启用 ZHFrontend 路径，其他值回退到 legacy_call()。
     // unk: placeholder ZHFrontend emits for words without a pronunciation. Default "<unk>".
     //      ZHFrontend 对无法注音的词输出的占位符，默认 "<unk>"。
-    // eng_dict_path: CMU pronouncing dictionary for English words; empty = no dictionary.
-    //                英文 CMU 词典路径；为空则不加载词典。
-    // eng_user_dict_path: optional CMU-format entries overriding the CMU dict.
-    //                     可选的 CMU 格式用户词典，条目覆盖 CMU 词典。
-    // eng_neural_model_path: optional g2p_en ONNX model for out-of-vocabulary English words.
-    //                        可选的 g2p_en ONNX 模型，兜底词典未收录的英文词。
-    ZHG2P(std::shared_ptr<TextProcessor> processor, const std::string& version = "1.1", const std::string& unk = "<unk>",
-          const std::string& eng_dict_path = "", const std::string& eng_user_dict_path = "",
-          const std::string& eng_neural_model_path = "");
+    // eng_g2p: English word G2P, shared with EnglishPhonemizer.
+    //          英文 G2P，与 EnglishPhonemizer 共享。
+    ZHG2P(std::shared_ptr<TextProcessor> processor, std::shared_ptr<const EnG2P> eng_g2p,
+          const std::string& version = "1.1", const std::string& unk = "<unk>");
 
     // Main entry: text -> (IPA phoneme string, extra info). Empty input yields {"", ""}.
     // Spacing rule of the 1.1 path: a space is inserted before and after English runs so
@@ -110,7 +105,7 @@ private:
     std::string unk;       // unknown-word placeholder passed to ZHFrontend (未登录词占位符)
     std::shared_ptr<TextProcessor> processor;  // jieba segmentation + pinyin (分词与拼音)
     std::unique_ptr<ZHFrontend> frontend;      // non-null only for version "1.1" (仅 1.1 版非空)
-    std::unique_ptr<EnG2P> eng_g2p;            // CMU dict + optional neural OOV fallback (英文 G2P)
+    std::shared_ptr<const EnG2P> eng_g2p;      // CMU dict + optional neural OOV fallback (英文 G2P)
     NumberLanguage number_language_ = NumberLanguage::Auto;
 
     // pinyin syllable -> IPA segments: initial + final with tone marks applied (the "0"

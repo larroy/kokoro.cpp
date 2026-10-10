@@ -1,5 +1,6 @@
 #include "Kokoro.h"
-#include "Tokenizer.h"
+#include "Phonemizer.h"
+#include "PhonemeEncoder.h"
 #include "PhonemeChunker.h"
 #include <fstream>
 #include <sstream>
@@ -88,41 +89,13 @@ Kokoro::Kokoro(const std::string& model_path, const std::string& voices_path, co
     // Load voices
     load_voices(voices_path);
 
-    // Load vocab
     std::string dir = dict_dir;
     if (!dir.empty() && dir.back() != '/' && dir.back() != '\\') dir += "/";
-    const std::string vocab_path = dir + "vocab.txt";
-    std::map<std::string, int> vocab;
-    std::ifstream in(utf8_path(vocab_path));
-    if (!in.is_open()) {
-        throw std::runtime_error("Failed to open vocab file: " + vocab_path);
-    }
-    std::string line;
-    while (std::getline(in, line)) {
-        // Expected format: token<TAB>id
-        size_t tab = line.find('\t');
-        if (tab == std::string::npos) continue;
-        std::string token = line.substr(0, tab);
-        std::string id_str = line.substr(tab + 1);
-        // Unescape token if needed (\n, \r, \t)
-        size_t pos = 0;
-        while((pos = token.find("\\n", pos)) != std::string::npos) { token.replace(pos, 2, "\n"); pos += 1; }
-        pos = 0;
-        while((pos = token.find("\\r", pos)) != std::string::npos) { token.replace(pos, 2, "\r"); pos += 1; }
-        pos = 0;
-        while((pos = token.find("\\t", pos)) != std::string::npos) { token.replace(pos, 2, "\t"); pos += 1; }
+    encoder_ = std::make_unique<PhonemeEncoder>(PhonemeEncoder::load(dir + "vocab.txt"));
 
-        try {
-            vocab[token] = std::stoi(id_str);
-        } catch (...) {}
-    }
-    if (vocab.empty()) {
-        throw std::runtime_error("Vocab file contains no tokens: " + vocab_path);
-    }
-
-    TokenizerConfig config;
+    PhonemizerConfig config;
     config.dict_dir = dir;
-    tokenizer_ = std::make_unique<Tokenizer>(config, vocab);
+    phonemizer_ = std::make_unique<Phonemizer>(config);
 }
 
 Kokoro::~Kokoro() {
@@ -193,20 +166,25 @@ std::vector<std::string> Kokoro::voice_names() const {
 }
 
 std::string Kokoro::phonemize(const std::string& text, G2PLanguage language) {
-    return tokenizer_->phonemize(text, language);
+    return phonemizer_->phonemize(text, language);
 }
 
 void Kokoro::set_number_language(NumberLanguage language) {
-    if (tokenizer_) tokenizer_->set_number_language(language);
+    if (phonemizer_) phonemizer_->set_number_language(language);
 }
 
 void Kokoro::set_language(std::optional<G2PLanguage> forced) { forced_language_ = forced; }
 
 G2PLanguage Kokoro::language_for(const std::string& voice_name) const {
     if (forced_language_) return *forced_language_;
-    const bool spanish_voice = voice_name.size() > 3 && voice_name[0] == 'e' &&
-                               (voice_name[1] == 'f' || voice_name[1] == 'm') && voice_name[2] == '_';
-    return spanish_voice ? G2PLanguage::Spanish : G2PLanguage::ChineseEnglish;
+    const bool kokoro_name = voice_name.size() > 3 && (voice_name[1] == 'f' || voice_name[1] == 'm') &&
+                             voice_name[2] == '_';
+    if (!kokoro_name) return G2PLanguage::ChineseEnglish;
+    switch (voice_name[0]) {
+        case 'e': return G2PLanguage::Spanish;
+        case 'a': case 'b': return G2PLanguage::English;
+        default: return G2PLanguage::ChineseEnglish;
+    }
 }
 
 std::pair<std::vector<float>, int> Kokoro::_create_audio(
@@ -219,7 +197,7 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
         truncated_phonemes = phonemes.substr(0, MAX_PHONEME_LENGTH);
     }
 
-    std::vector<int> tokens_raw = tokenizer_->tokenize(truncated_phonemes);
+    std::vector<int> tokens_raw = encoder_->encode(truncated_phonemes);
     // Nothing to say: skip the model rather than run it on the padding tokens alone, as upstream
     // Kokoro skips empty phoneme strings (`if not ps: continue`).
     if (tokens_raw.empty()) return {{}, SAMPLE_RATE};

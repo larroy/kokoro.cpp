@@ -21,7 +21,7 @@ internal static class CliParser
           -d, --dict <dir>      dictionary directory (default: dict)
           -v, --voice <name>    initial voice (default: af_maple)
               --lang <auto|en|zh|es>  language for reading numbers (default: auto)
-              --language <auto|es>  text language; auto: Spanish for ef_*/em_* voices, else Chinese/English (default: auto)
+              --language <auto|zh|en|es>  text language; auto: es for ef_*/em_*, en for af_/am_/bf_/bm_* voices, else zh (default: auto)
           -s, --speed <rate>    initial speaking rate, > 0 (default: 1.0)
               --device <name>   auto, cpu or cuda (default: auto)
               --gpu-id <n>      CUDA device to use (default: 0)
@@ -137,7 +137,7 @@ internal static class CliParser
             : new ParseResult(null, $"invalid number language '{value}' (must be auto, en, zh or es)"),
         Opt.Language => TryParseLanguage(value, out var language)
             ? new ParseResult(options with { Language = language }, null)
-            : new ParseResult(null, $"invalid language '{value}' (must be auto or es)"),
+            : new ParseResult(null, $"invalid language '{value}' (must be auto, zh, en or es)"),
         Opt.Device => TryParseDevice(value, out var device)
             ? new ParseResult(options with { Device = device }, null)
             : new ParseResult(null, $"invalid device '{value}' (expected auto, cpu or cuda)"),
@@ -177,6 +177,12 @@ internal static class CliParser
         {
             case "auto":
                 language = KokoroLanguage.Auto;
+                return true;
+            case "zh":
+                language = KokoroLanguage.ChineseEnglish;
+                return true;
+            case "en":
+                language = KokoroLanguage.English;
                 return true;
             case "es":
                 language = KokoroLanguage.Spanish;

@@ -93,14 +93,12 @@ static std::string trim(const std::string& str) {
 // ZHG2P Implementation
 // ==========================================
 
-ZHG2P::ZHG2P(std::shared_ptr<TextProcessor> proc, const std::string& ver, const std::string& u,
-             const std::string& eng_dict_path, const std::string& eng_user_dict_path,
-             const std::string& eng_neural_model_path)
-    : processor(std::move(proc)), version(ver), unk(u) {
+ZHG2P::ZHG2P(std::shared_ptr<TextProcessor> proc, std::shared_ptr<const EnG2P> eng, const std::string& ver,
+             const std::string& u)
+    : version(ver), unk(u), processor(std::move(proc)), eng_g2p(std::move(eng)) {
     if (version == "1.1") {
         frontend = std::make_unique<ZHFrontend>(processor, unk);
     }
-    eng_g2p = std::make_unique<EnG2P>(eng_dict_path, eng_user_dict_path, eng_neural_model_path);
 }
 
 std::string ZHG2P::retone(std::string p) {

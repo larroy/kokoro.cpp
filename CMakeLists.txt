@@ -100,15 +100,19 @@ endif()
 add_library(kokoro_core STATIC
     src/Kokoro.cpp
     src/PhonemeChunker.cpp
-    src/Tokenizer.cpp
-    src/ZHG2P.cpp
+    src/Phonemizer.cpp
+    src/PhonemeEncoder.cpp
+    src/chinese_english/ChineseEnglishPhonemizer.cpp
+    src/english/EnglishPhonemizer.cpp
+    src/spanish/SpanishPhonemizer.cpp
+    src/chinese_english/ZHG2P.cpp
     src/NumberNormalizer.cpp
-    src/PinyinFinder.cpp
-    src/ToneSandhi.cpp
-    src/ZHFrontend.cpp
-    src/NeuralG2P.cpp
-    src/SpanishG2P.cpp
-    src/SpanishLoanwords.cpp
+    src/chinese_english/PinyinFinder.cpp
+    src/chinese_english/ToneSandhi.cpp
+    src/chinese_english/ZHFrontend.cpp
+    src/english/NeuralG2P.cpp
+    src/spanish/SpanishG2P.cpp
+    src/spanish/SpanishLoanwords.cpp
 )
 target_include_directories(kokoro_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src

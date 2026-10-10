@@ -144,7 +144,7 @@ private:
 
     // ARPAbet -> Kokoro's English phoneme set (misaki, US; see
     // https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md). Every output symbol must
-    // exist in dict/vocab.txt: Tokenizer::tokenize silently drops unknown symbols.
+    // exist in dict/vocab.txt: PhonemeEncoder::encode silently drops unknown symbols.
     // Diphthongs use misaki's single-letter forms: A=eɪ, I=aɪ, O=oʊ, W=aʊ, Y=ɔɪ.
     static std::string arpabet_to_ipa(const std::vector<std::string>& phonemes) {
         static const std::unordered_map<std::string, const char*> MISAKI = {

@@ -4,11 +4,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
 
-#include "JiebaProcessor.h"
+#include "chinese_english/JiebaProcessor.h"
 #include "NumberNormalizer.h"
-#include "SpanishG2P.h"
-#include "Tokenizer.h"
-#include "ZHG2P.h"
+#include "spanish/SpanishG2P.h"
+#include "Phonemizer.h"
+#include "english/EnG2P.h"
+#include "english/EnglishPhonemizer.h"
+#include "chinese_english/ZHG2P.h"
 
 #include <cstdio>
 #include <exception>
@@ -22,6 +24,7 @@ namespace {
 
 std::shared_ptr<JiebaProcessor> g_proc;
 std::unique_ptr<ZHG2P> g_g2p;
+std::unique_ptr<EnglishPhonemizer> g_en;
 
 struct Case {
     const char* input;
@@ -327,6 +330,24 @@ TEST_CASE("neutral_tone") {
     check_g2p(cases);
 }
 
+TEST_CASE("english_phonemizer") {
+    static const Case cases[] = {
+        {"I am here. You and I.", "ˈI ˈæm hˈiɹ. jˈu ənd ˈI."},
+        {"What's the weather today?", "wˈʌts ðə wˈɛðəɹ tədˈA?"},
+        {"It’s mine.", "ˈɪts mˈIn."},
+        {"rock'n'roll", "ɹˈɑkənɹˈOl"},
+        {"GPU's", "ʤˈipˈijˈuz"},
+        {"I have 3 apples and 25 pears in 2024.",
+         "ˈI hˈæv θɹˈi ˈæpəlz ənd twˈɛnti fˈIv pˈɛɹz ɪn tˈu θˈWzənd twˈɛnti fˈɔɹ."},
+        {"3", "θɹˈi"},  // Auto reads numbers as English; ZHG2P reads a lone "3" as Chinese
+    };
+    for (const Case& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(g_en->phonemize(input, NumberLanguage::Auto) == std::string(c.expected));
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: test_g2p <dict_dir> [doctest options]\n");
@@ -334,13 +355,15 @@ int main(int argc, char** argv) {
     }
 
     const std::string dir = std::string(argv[1]) + "/";
-    const TokenizerConfig cfg;
+    const PhonemizerConfig cfg;
     try {
         g_proc = std::make_shared<JiebaProcessor>(dir + cfg.jieba_dict, dir + cfg.hmm_model, dir + cfg.user_dict,
                                                   dir + cfg.idf_path, dir + cfg.stop_word_path,
                                                   dir + cfg.pinyin_char, dir + cfg.pinyin_phrase);
-        g_g2p = std::make_unique<ZHG2P>(g_proc, "1.1", "<unk>", dir + cfg.cmu_dict, dir + cfg.user_en_dict,
-                                        dir + cfg.g2p_en_model);
+        const auto eng = std::make_shared<const EnG2P>(dir + cfg.cmu_dict, dir + cfg.user_en_dict,
+                                                       dir + cfg.g2p_en_model);
+        g_g2p = std::make_unique<ZHG2P>(g_proc, eng);
+        g_en = std::make_unique<EnglishPhonemizer>(eng);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "failed to load G2P: %s\n", e.what());
         return 1;

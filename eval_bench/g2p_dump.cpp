@@ -1,5 +1,5 @@
 // Prints one phoneme line per stdin line, for compare_g2p.py.
-#include "SpanishG2P.h"
+#include "spanish/SpanishG2P.h"
 
 #include <iostream>
 #include <string>

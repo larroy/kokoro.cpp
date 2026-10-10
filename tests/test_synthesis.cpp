@@ -41,6 +41,23 @@ std::vector<float> synth(const char* text, const char* voice, float speed, unsig
     return synth(g_ctx, text, voice, speed, flags, status);
 }
 
+std::string ph(const char* text) {
+    char* phonemes = nullptr;
+    REQUIRE(kokoro_phonemize(g_ctx, text, &phonemes) == KOKORO_OK);
+    const std::string result = phonemes;
+    kokoro_string_free(phonemes);
+    return result;
+}
+
+size_t synth_length(const char* text, const char* voice, unsigned flags) {
+    kokoro_status status = KOKORO_ERROR_UNKNOWN;
+    const size_t n = synth(text, voice, 1.0f, flags, &status).size();
+    CAPTURE(std::string(text));
+    CAPTURE(std::string(voice));
+    CHECK(status == KOKORO_OK);
+    return n;
+}
+
 // Minimal reader/writer for the voices file format (docs/adding-voices.md).
 using VoiceTable = std::map<std::string, std::vector<float>>;
 constexpr size_t kStyleDim = 256;
@@ -151,6 +168,23 @@ TEST_CASE("number_language_selects_reading") {
     CHECK(kokoro_set_number_language(g_ctx, static_cast<kokoro_number_language>(7)) == KOKORO_ERROR_INVALID_ARGUMENT);
 
     REQUIRE(kokoro_set_number_language(g_ctx, KOKORO_NUMBERS_AUTO) == KOKORO_OK);
+}
+
+TEST_CASE("language_selection") {
+    const std::string p_zh = ph("3");  // AUTO without a voice: Chinese/English
+    CHECK(p_zh.find("sa→n") != std::string::npos);
+    REQUIRE(kokoro_set_language(g_ctx, KOKORO_LANGUAGE_ENGLISH) == KOKORO_OK);
+    const std::string p_en = ph("3");
+    CHECK(p_en == "θɹˈi");
+    REQUIRE(kokoro_set_language(g_ctx, KOKORO_LANGUAGE_CHINESE_ENGLISH) == KOKORO_OK);
+    CHECK(ph("中国") == "ʈʂʊ→ŋkwo↗");
+    REQUIRE(kokoro_set_language(g_ctx, KOKORO_LANGUAGE_AUTO) == KOKORO_OK);
+
+    // AUTO routes by voice name; the duration predictor is deterministic, so equal phonemes give equal lengths.
+    const size_t n_en = synth_length(p_en.c_str(), "af_maple", KOKORO_INPUT_PHONEMES);
+    REQUIRE(n_en != synth_length(p_zh.c_str(), "af_maple", KOKORO_INPUT_PHONEMES));
+    CHECK(synth_length("3", "af_maple", 0) == n_en);
+    CHECK(synth_length("3", kVoice, 0) == synth_length(p_zh.c_str(), kVoice, KOKORO_INPUT_PHONEMES));
 }
 
 TEST_CASE("phoneme_input_matches_text_input") {

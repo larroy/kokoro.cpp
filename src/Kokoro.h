@@ -12,8 +12,8 @@
 #include "G2PLanguage.h"
 #include "NumberNormalizer.h"
 
-// Forward declarations or placeholder for dependencies
-class Tokenizer;
+class Phonemizer;
+class PhonemeEncoder;
 struct KoKoroConfig;
 
 // Constants from config
@@ -66,7 +66,7 @@ public:
     
     /** \brief Converts plain text to a phoneme string.
      *
-     *  Uses the loaded G2P dictionaries and tokenizer to transform text
+     *  Uses the Phonemizer implementation for `language` to transform text
      *  into the phoneme representation used by the synthesis engine.
      *
      *  \param text Input text to phonemize (UTF-8).
@@ -76,14 +76,17 @@ public:
     std::string phonemize(const std::string& text, G2PLanguage language);
 
     // How G2P reads digits in later phonemize()/create() calls. An explicit language (English/Chinese/Spanish) wins
-    // in both G2Ps; Auto reads Spanish text's numbers in Spanish and keeps the nearest-script rule otherwise.
+    // in every phonemizer; Auto reads Spanish text's numbers in Spanish, English text's in English, and keeps the
+    // nearest-script rule for Chinese/English text.
     void set_number_language(NumberLanguage language);
 
     // Forces the G2P language for later create() calls by voice name; nullopt = auto (see language_for()).
-    // Number reading follows set_number_language(): an explicit number language also applies to Spanish text.
+    // Number reading follows set_number_language(): an explicit number language also applies to Spanish and English
+    // text.
     void set_language(std::optional<G2PLanguage> forced);
 
-    // The forced language if set; else Spanish for voices named ef_* / em_*, else ChineseEnglish. "" = no voice.
+    // The forced language if set; else by voice name: ef_/em_* Spanish, af_/am_/bf_/bm_* English, else
+    // ChineseEnglish. "" = no voice.
     G2PLanguage language_for(const std::string& voice_name) const;
 
     /** \brief Synthesizes audio from text using a named voice.
@@ -137,7 +140,8 @@ private:
     // Placeholder for voices data: map from name to vector
     std::map<std::string, std::vector<float>> voices_;
     
-    std::unique_ptr<Tokenizer> tokenizer_;
+    std::unique_ptr<Phonemizer> phonemizer_;
+    std::unique_ptr<PhonemeEncoder> encoder_;
     std::optional<G2PLanguage> forced_language_;  // nullopt: by voice name
     
     // Internal methods

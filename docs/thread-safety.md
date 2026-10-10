@@ -11,9 +11,9 @@ The rule is stated in `include/kokoro/kokoro.h`, in the C API section of `README
 
 - **Changing settings races with synthesis.** No lock is taken anywhere in `src/`.
   - `kokoro_set_language` writes `Kokoro::forced_language_`.
-  - `kokoro_set_number_language` writes `Tokenizer::number_language_`.
+  - `kokoro_set_number_language` writes `Phonemizer::number_language_`.
   - Both values are read during `create()` and `phonemize()` with no synchronization. Changing them while another thread synthesizes is a data race.
-- **The G2P path has not been checked for concurrent use.** `Tokenizer` owns the cppjieba processor, `ZHG2P` and the English G2P. None of them is documented or checked as safe to share across threads.
+- **The G2P path has not been checked for concurrent use.** `Phonemizer` owns the cppjieba processor, `ZHG2P`, the shared English G2P and the Spanish loanwords. None of them is documented or checked as safe to share across threads.
 - **Inference on its own is probably fine.** ONNX Runtime documents `Ort::Session::Run` (used in `Kokoro::_create_audio`) as safe to call concurrently. That does not make a whole `create()` call safe, and the public contract does not promise it.
 
 ## Why separate contexts are safe

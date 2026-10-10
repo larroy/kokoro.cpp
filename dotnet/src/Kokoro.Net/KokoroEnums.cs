@@ -42,8 +42,8 @@ public enum KokoroDevice
 public enum KokoroNumberLanguage
 {
     /// <summary>
-    /// Spanish text (<see cref="KokoroContext.SetLanguage"/>): Spanish. Chinese/English text: per number, the
-    /// language of the nearest letter or CJK character; Chinese if none.
+    /// Spanish text (<see cref="KokoroContext.SetLanguage"/>): Spanish. English text: English. Chinese/English text:
+    /// per number, the language of the nearest letter or CJK character; Chinese if none.
     /// </summary>
     Auto = 0,
 
@@ -53,21 +53,27 @@ public enum KokoroNumberLanguage
     /// <summary>Read digits as Chinese words.</summary>
     Chinese = 2,
 
-    /// <summary>Spanish words; in Chinese/English text they are read by the English G2P.</summary>
+    /// <summary>Spanish words; in Chinese/English and English text they are read by the English G2P.</summary>
     Spanish = 3,
 }
 
-/// <summary>Which G2P reads text (<c>kokoro_language</c>).</summary>
+/// <summary>Which phonemizer reads text (<c>kokoro_language</c>).</summary>
 public enum KokoroLanguage
 {
     /// <summary>
-    /// Synthesize: Spanish for voices named ef_* or em_*, else Chinese and English by script;
-    /// phonemize: Chinese and English by script.
+    /// Synthesize: by voice name, ef_/em_* Spanish, af_/am_/bf_/bm_* English, else Chinese and English;
+    /// phonemize: Chinese and English.
     /// </summary>
     Auto = 0,
 
     /// <summary>All text is read as Spanish, numbers in Spanish.</summary>
     Spanish = 1,
+
+    /// <summary>Chinese and English by script.</summary>
+    ChineseEnglish = 2,
+
+    /// <summary>All text is read as English, numbers in English.</summary>
+    English = 3,
 }
 
 /// <summary>Flags for <see cref="KokoroContext.Synthesize"/>.</summary>

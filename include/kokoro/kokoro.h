@@ -43,18 +43,21 @@ typedef enum kokoro_status {
 
 /* How G2P reads digits (see kokoro_set_number_language). */
 typedef enum kokoro_number_language {
-    KOKORO_NUMBERS_AUTO = 0,    /* Spanish text (kokoro_set_language): Spanish. Chinese/English text: per number, the
+    KOKORO_NUMBERS_AUTO = 0,    /* Spanish text: Spanish. English text: English. Chinese/English text: per number, the
                                    language of the nearest letter or CJK character; Chinese if none */
     KOKORO_NUMBERS_ENGLISH = 1,
     KOKORO_NUMBERS_CHINESE = 2,
-    KOKORO_NUMBERS_SPANISH = 3  /* Spanish words; in Chinese/English text they are read by the English G2P */
+    KOKORO_NUMBERS_SPANISH = 3  /* Spanish words; in Chinese/English and English text they are read by the English
+                                   G2P */
 } kokoro_number_language;
 
-/* Which G2P reads text (see kokoro_set_language). */
+/* Which phonemizer reads text (see kokoro_set_language). */
 typedef enum kokoro_language {
-    KOKORO_LANGUAGE_AUTO = 0,   /* kokoro_synthesize: Spanish for voices named ef_* or em_*, else Chinese and
-                                   English by script; kokoro_phonemize: Chinese and English by script */
-    KOKORO_LANGUAGE_SPANISH = 1 /* all text is read as Spanish, numbers in Spanish */
+    KOKORO_LANGUAGE_AUTO = 0,            /* kokoro_synthesize: by voice name, ef_/em_* Spanish, af_/am_/bf_/bm_*
+                                            English, else Chinese and English; kokoro_phonemize: Chinese and English */
+    KOKORO_LANGUAGE_SPANISH = 1,         /* all text is read as Spanish, numbers in Spanish */
+    KOKORO_LANGUAGE_CHINESE_ENGLISH = 2, /* Chinese and English by script */
+    KOKORO_LANGUAGE_ENGLISH = 3          /* all text is read as English, numbers in English */
 } kokoro_language;
 
 typedef struct kokoro_ctx kokoro_ctx;
@@ -135,7 +138,7 @@ KOKORO_API kokoro_status kokoro_phonemize(kokoro_ctx* ctx, const char* text, cha
 KOKORO_API kokoro_status kokoro_set_number_language(kokoro_ctx* ctx, kokoro_number_language language);
 
 /* Sets the G2P language for later kokoro_synthesize/kokoro_phonemize calls on ctx. Default: KOKORO_LANGUAGE_AUTO.
- * A number language other than KOKORO_NUMBERS_AUTO also applies to Spanish text. */
+ * A number language other than KOKORO_NUMBERS_AUTO also applies to Spanish and English text. */
 KOKORO_API kokoro_status kokoro_set_language(kokoro_ctx* ctx, kokoro_language language);
 
 /* Frees samples and zeroes *audio. NULL is ignored. */

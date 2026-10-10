@@ -89,8 +89,8 @@ void print_usage(std::FILE* out) {
         "  -d, --dict <dir>      dictionary directory (default: dict)\n"
         "  -v, --voice <name>    voice to use (default: af_maple)\n"
         "      --lang <auto|en|zh|es>  language for reading numbers (default: auto)\n"
-        "      --language <auto|es>  text language; auto: Spanish for ef_*/em_* voices, else Chinese/English "
-        "(default: auto)\n"
+        "      --language <auto|zh|en|es>  text language; auto: es for ef_*/em_*, en for af_/am_/bf_/bm_* voices, "
+        "else zh (Chinese/English) (default: auto)\n"
         "  -s, --speed <rate>    speaking rate, > 0 (default: 1.0)\n"
 "  -o, --output <path>   output WAV file (default: output.wav; unused with -i)\n"
         "      --device <name>   auto, cpu or cuda (default: auto)\n"
@@ -118,9 +118,11 @@ bool parse_number_language(const std::string& value, kokoro_number_language& lan
     return false;
 }
 
-// Maps the --language value; returns false for anything but "auto" or "es".
+// Maps the --language value; returns false for anything but "auto", "zh", "en" or "es".
 bool parse_language(const std::string& value, kokoro_language& language) {
     if (value == "auto") { language = KOKORO_LANGUAGE_AUTO; return true; }
+    if (value == "zh") { language = KOKORO_LANGUAGE_CHINESE_ENGLISH; return true; }
+    if (value == "en") { language = KOKORO_LANGUAGE_ENGLISH; return true; }
     if (value == "es") { language = KOKORO_LANGUAGE_SPANISH; return true; }
     return false;
 }
@@ -193,7 +195,7 @@ bool parse_args(const std::vector<std::string>& args, Options& opt) {
                 break;
             case Opt::Language:
                 if (!parse_language(value, opt.language)) {
-                    return usage_error("invalid language '" + value + "' (must be auto or es)");
+                    return usage_error("invalid language '" + value + "' (must be auto, zh, en or es)");
                 }
                 break;
             case Opt::Output: opt.output = value; break;

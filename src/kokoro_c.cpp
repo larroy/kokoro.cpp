@@ -183,6 +183,8 @@ kokoro_status kokoro_set_language(kokoro_ctx* ctx, kokoro_language language) {
     switch (language) {
         case KOKORO_LANGUAGE_AUTO:    ctx->tts.set_language(std::nullopt);           break;
         case KOKORO_LANGUAGE_SPANISH: ctx->tts.set_language(G2PLanguage::Spanish); break;
+        case KOKORO_LANGUAGE_CHINESE_ENGLISH: ctx->tts.set_language(G2PLanguage::ChineseEnglish); break;
+        case KOKORO_LANGUAGE_ENGLISH: ctx->tts.set_language(G2PLanguage::English); break;
         default: return fail(KOKORO_ERROR_INVALID_ARGUMENT, "unknown language");
     }
     return KOKORO_OK;
