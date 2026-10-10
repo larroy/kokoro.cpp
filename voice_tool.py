@@ -136,6 +136,99 @@ def load_raw(path: Path) -> array:
     return style
 
 
+GGUF_MAGIC = b"GGUF"
+GGUF_VERSIONS = (2, 3)
+GGUF_STRING, GGUF_ARRAY = 8, 9
+GGUF_SCALARS = {0: "<B", 1: "<b", 2: "<H", 3: "<h", 4: "<I", 5: "<i", 6: "<f", 7: "<?", 10: "<Q", 11: "<q", 12: "<d"}
+GGUF_F32 = 0
+GGUF_DEFAULT_ALIGNMENT = 32
+GGUF_VOICE_TENSOR = "voice.pack"
+
+
+@dataclass
+class GgufCursor:
+    """Read position in an in-memory GGUF file; reads past the end raise a truncation error."""
+    data: bytes
+    path: Path
+    pos: int = 0
+
+    def take(self, size: int) -> bytes:
+        if self.pos + size > len(self.data):
+            raise click.ClickException(f"{self.path}: truncated GGUF file")
+        chunk = self.data[self.pos:self.pos + size]
+        self.pos += size
+        return chunk
+
+    def unpack(self, fmt: str) -> int | float | bool:
+        return struct.unpack(fmt, self.take(struct.calcsize(fmt)))[0]
+
+    def string(self) -> str:
+        return self.take(int(self.unpack("<Q"))).decode("utf-8")
+
+
+@dataclass(frozen=True)
+class GgufTensor:
+    kind: int
+    dims: list[int]
+    offset: int  # from the start of the aligned tensor data
+
+
+def read_gguf_value(cur: GgufCursor, kind: int) -> object:
+    if kind == GGUF_STRING:
+        return cur.string()
+    if kind == GGUF_ARRAY:
+        element, count = int(cur.unpack("<I")), int(cur.unpack("<Q"))
+        return [read_gguf_value(cur, element) for _ in range(count)]
+    if kind not in GGUF_SCALARS:
+        raise click.ClickException(f"{cur.path}: unknown GGUF value type {kind}")
+    return cur.unpack(GGUF_SCALARS[kind])
+
+
+def read_gguf_kv(cur: GgufCursor) -> tuple[str, object]:
+    key = cur.string()
+    return key, read_gguf_value(cur, int(cur.unpack("<I")))
+
+
+def read_gguf_tensor(cur: GgufCursor) -> tuple[str, GgufTensor]:
+    name = cur.string()
+    dims = [int(cur.unpack("<Q")) for _ in range(int(cur.unpack("<I")))]
+    kind = int(cur.unpack("<I"))
+    return name, GgufTensor(kind, dims, int(cur.unpack("<Q")))
+
+
+def read_gguf_header(cur: GgufCursor) -> tuple[int, int]:
+    """Tensor and key/value counts after the magic and version."""
+    if cur.data[:4] != GGUF_MAGIC or len(cur.data) < 8:
+        raise click.ClickException(f"{cur.path}: not a GGUF file")
+    cur.pos = 4
+    if cur.unpack("<I") not in GGUF_VERSIONS:
+        raise click.ClickException(f"{cur.path}: not a GGUF file")
+    return int(cur.unpack("<Q")), int(cur.unpack("<Q"))
+
+
+def load_gguf(path: Path) -> array:
+    """Read the voice.pack tensor of a GGUF voice pack (cstr/kokoro-voices-GGUF), F32 [rows, 1, 256] with
+    rows >= 510, and keep the first 510 rows."""
+    cur = GgufCursor(path.read_bytes(), path)
+    tensor_count, kv_count = read_gguf_header(cur)
+    metadata = dict(read_gguf_kv(cur) for _ in range(kv_count))
+    tensors = dict(read_gguf_tensor(cur) for _ in range(tensor_count))
+    alignment = int(metadata.get("general.alignment", GGUF_DEFAULT_ALIGNMENT))
+    data_start = -(-cur.pos // alignment) * alignment
+    tensor = tensors.get(GGUF_VOICE_TENSOR)
+    if tensor is None:
+        raise click.ClickException(f"{path}: no {GGUF_VOICE_TENSOR} tensor")
+    # GGUF lists dims innermost first: [256, 1, rows] is a [rows, 1, 256] array.
+    if tensor.kind != GGUF_F32 or len(tensor.dims) != 3 or tensor.dims[:2] != [DIM, 1] or tensor.dims[2] < ROWS:
+        raise click.ClickException(f"{path}: {GGUF_VOICE_TENSOR} must be F32 [rows, 1, {DIM}] with rows >= {ROWS}, "
+                                   f"got type {tensor.kind} dims {tensor.dims}")
+    cur.pos = data_start + tensor.offset
+    style = array("f", cur.take(STYLE_LEN * 4))
+    if sys.byteorder == "big":
+        style.byteswap()
+    return style
+
+
 def store_voice(voices: dict[str, array], name: str, style: array, output: Path) -> None:
     replaced = name in voices
     voices[name] = style

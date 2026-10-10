@@ -11,6 +11,8 @@
 #include "english/EnG2P.h"
 #include "english/EnglishPhonemizer.h"
 #include "chinese_english/ZHG2P.h"
+#include "german/GermanG2P.h"
+#include "german/GermanLexicon.h"
 
 #include <cstdio>
 #include <exception>
@@ -25,6 +27,7 @@ namespace {
 std::shared_ptr<JiebaProcessor> g_proc;
 std::unique_ptr<ZHG2P> g_g2p;
 std::unique_ptr<EnglishPhonemizer> g_en;
+std::unique_ptr<GermanLexicon> g_de;
 
 struct Case {
     const char* input;
@@ -112,6 +115,38 @@ TEST_CASE("number_conversion_spanish") {
     }
 }
 
+TEST_CASE("number_conversion_german") {
+    static const Case cases[] = {
+        {"0", "null"},
+        {"1", "eins"},
+        {"16", "sechzehn"},
+        {"17", "siebzehn"},
+        {"21", "einundzwanzig"},
+        {"30", "dreißig"},
+        {"99", "neunundneunzig"},
+        {"100", "einhundert"},
+        {"101", "einhundert eins"},
+        {"250", "zweihundert fünfzig"},
+        {"1000", "eintausend"},
+        {"1984", "eintausend neunhundert vierundachtzig"},
+        {"2024", "zwei tausend vierundzwanzig"},
+        {"101000", "einhundert ein tausend"},
+        {"1000000", "eine million"},
+        {"2500000", "zwei millionen fünfhundert tausend"},
+        {"3000000000", "drei milliarden"},
+        {"-5", "minus fünf"},
+        {"3.14", "drei komma eins vier"},
+        {"1.2.3", "eins punkt zwei punkt drei"},
+        {"1234567890123", "eins zwei drei vier fünf sechs sieben acht neun null eins zwei drei"},
+        {"ich habe 3 katzen", "ich habe drei katzen"},
+    };
+    for (const Case& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(normalize_numbers(input, NumberLanguage::German) == std::string(c.expected));
+    }
+}
+
 TEST_CASE("number_language_auto_and_forced") {
     struct NumCase {
         const char* input;
@@ -125,6 +160,7 @@ TEST_CASE("number_language_auto_and_forced") {
         {"IPV4地址是192.168.0.1", NumberLanguage::Auto, "IPV four地址是一九二点一六八点零点一"},
         {"I have 3 apples", NumberLanguage::Chinese, "I have 三 apples"},
         {"I have 3 apples", NumberLanguage::Spanish, "I have tres apples"},
+        {"I have 3 apples", NumberLanguage::German, "I have drei apples"},
         {"tengo 3 gatos", NumberLanguage::Auto, "tengo three gatos"},
     };
     for (const NumCase& c : cases) {
@@ -348,6 +384,33 @@ TEST_CASE("english_phonemizer") {
     }
 }
 
+TEST_CASE("german_g2p") {
+    // MFA dictionary phones mapped to espeak-ng `de` conventions (src/german/GermanPronunciation.cpp).
+    static const Case cases[] = {
+        {"Guten Tag, dies ist ein Test.", "ɡˈuːtən tˈak, diːs ɪst In tˈɛst."},
+        {"Der Hund läuft schnell durch den Garten.", "dɛɾ hˈʊnt lˈɔøft ʃnˈɛl dʊɐç deːn ɡˈaɾtən."},
+        {"Er versteht die Frage nicht.", "ɛɾ fɛɾʃtˈeːt diː frˈɑːɡə nˈɪçt."},
+        {"Die Studenten studieren Philosophie.", "diː ʃtʊdˈɛntən ʃtʊdˈiːrən fɪlɔzɔfˈiː."},
+        {"Die Polizei sucht nach dem Fahrrad.", "diː pɔlɪʦˈI zˈʊxt nɑːx deːm fˈarat."},
+        {"Ich habe 250 Euro.", "ɪç hɑːbə ʦvˈIhʊndɜt fˈynfʦɪk ˈɔørɔ."},
+        {"Die Fahrradschlosskette ist kaputt.", "diː fˈaratʃlɔskɛtə ɪst kˈapʊt."},  // compound split
+        {"Kurz vor acht Uhr.", "kˈʊɐʦ foːɾ ˈaxt ˈuːɾ."},
+        {"Wie geht's?", "viː ɡˈeːts?"},
+        {"Phonemizers", "fˈɔnɛmiːɾs"},  // not in the dictionary: g2p_de GRU
+    };
+    for (const Case& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(german_to_phonemes(input, NumberLanguage::Auto, *g_de) == std::string(c.expected));
+    }
+}
+
+TEST_CASE("german_number_format") {
+    const auto ph = [](const char* text) { return german_to_phonemes(text, NumberLanguage::Auto, *g_de); };
+    CHECK(ph("1.000 und 3,5") == ph("eintausend und drei komma fünf"));
+    CHECK(ph("z. B.") == ph("zum Beispiel"));
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: test_g2p <dict_dir> [doctest options]\n");
@@ -364,6 +427,7 @@ int main(int argc, char** argv) {
                                                        dir + cfg.g2p_en_model);
         g_g2p = std::make_unique<ZHG2P>(g_proc, eng);
         g_en = std::make_unique<EnglishPhonemizer>(eng);
+        g_de = std::make_unique<GermanLexicon>(dir + cfg.de_dict, dir + cfg.g2p_de_model);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "failed to load G2P: %s\n", e.what());
         return 1;

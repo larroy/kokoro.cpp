@@ -172,6 +172,7 @@ kokoro_status kokoro_set_number_language(kokoro_ctx* ctx, kokoro_number_language
         case KOKORO_NUMBERS_ENGLISH: lang = NumberLanguage::English; break;
         case KOKORO_NUMBERS_CHINESE: lang = NumberLanguage::Chinese; break;
         case KOKORO_NUMBERS_SPANISH: lang = NumberLanguage::Spanish; break;
+        case KOKORO_NUMBERS_GERMAN: lang = NumberLanguage::German; break;
         default: return fail(KOKORO_ERROR_INVALID_ARGUMENT, "unknown number language");
     }
     ctx->tts.set_number_language(lang);
@@ -185,6 +186,7 @@ kokoro_status kokoro_set_language(kokoro_ctx* ctx, kokoro_language language) {
         case KOKORO_LANGUAGE_SPANISH: ctx->tts.set_language(G2PLanguage::Spanish); break;
         case KOKORO_LANGUAGE_CHINESE_ENGLISH: ctx->tts.set_language(G2PLanguage::ChineseEnglish); break;
         case KOKORO_LANGUAGE_ENGLISH: ctx->tts.set_language(G2PLanguage::English); break;
+        case KOKORO_LANGUAGE_GERMAN: ctx->tts.set_language(G2PLanguage::German); break;
         default: return fail(KOKORO_ERROR_INVALID_ARGUMENT, "unknown language");
     }
     return KOKORO_OK;

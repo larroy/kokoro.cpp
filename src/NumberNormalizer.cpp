@@ -107,6 +107,68 @@ std::string integer_to_spanish(const std::string& digits) {
     return head.empty() ? es_below_million(rest, false) : head + " " + es_below_million(rest, false);
 }
 
+const char* const g_de_below_twenty[] = {"null",     "eins",     "zwei",     "drei",     "vier",
+                                         "fünf",     "sechs",    "sieben",   "acht",     "neun",
+                                         "zehn",     "elf",      "zwölf",    "dreizehn", "vierzehn",
+                                         "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"};
+const char* const g_de_tens[] = {"", "", "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig",
+                                 "neunzig"};
+
+// Joins the non-empty pieces with single spaces.
+std::string join_words(std::initializer_list<std::string> pieces) {
+    std::string result;
+    for (const std::string& piece : pieces) {
+        if (piece.empty()) continue;
+        if (!result.empty()) result += ' ';
+        result += piece;
+    }
+    return result;
+}
+
+// German words for 0 < n < 100 as one word: "einundzwanzig"; final: 1 is "eins", else "ein" (before hundert etc.).
+std::string de_below_hundred(int n, bool final) {
+    if (n == 1) return final ? "eins" : "ein";
+    if (n < 20) return g_de_below_twenty[n];
+    const int ones = n % 10;
+    if (ones == 0) return g_de_tens[n / 10];
+    return std::string(ones == 1 ? "ein" : g_de_below_twenty[ones]) + "und" + g_de_tens[n / 10];
+}
+
+// German words for 0 <= n < 1000: "zweihundert fünfzig"; 0 is empty.
+std::string de_below_thousand(int n, bool final) {
+    const int hundreds = n / 100;
+    const int rest = n % 100;
+    return join_words({hundreds == 0 ? "" : de_below_hundred(hundreds, false) + "hundert",
+                       rest == 0 ? "" : de_below_hundred(rest, final)});
+}
+
+// German words for 0 <= n < 1000000: "zwei tausend vierundzwanzig"; 0 is empty.
+std::string de_below_million(int n, bool final) {
+    const int thousands = n / 1000;
+    const std::string head = thousands == 0   ? ""
+                             : thousands == 1 ? "eintausend"
+                                              : de_below_thousand(thousands, false) + " tausend";
+    return join_words({head, de_below_thousand(n % 1000, final)});
+}
+
+// German words for an integer digit string: "2500000" -> "zwei millionen fünfhundert tausend".
+std::string integer_to_german(const std::string& digits) {
+    const size_t first = digits.find_first_not_of('0');
+    if (first == std::string::npos) return "null";
+    const std::string trimmed = digits.substr(first);
+    if (trimmed.size() > 12) return spell_digits(trimmed, g_de_below_twenty);
+    const long long value = std::stoll(trimmed);
+    const int milliards = static_cast<int>(value / 1000000000);
+    const int millions = static_cast<int>(value / 1000000 % 1000);
+    const std::string milliard_words = milliards == 0   ? ""
+                                       : milliards == 1 ? "eine milliarde"
+                                                        : de_below_thousand(milliards, false) + " milliarden";
+    const std::string million_words = millions == 0   ? ""
+                                      : millions == 1 ? "eine million"
+                                                      : de_below_thousand(millions, false) + " millionen";
+    return join_words({milliard_words, million_words, de_below_million(static_cast<int>(value % 1000000), true)});
+}
+
 // English words for an integer digit string: "2024" -> "two thousand twenty four".
 std::string integer_to_english(const std::string& digits) {
     const size_t first = digits.find_first_not_of('0');
@@ -178,6 +240,7 @@ std::string read_number(const std::string& num_str, const NumberWords& words) {
 
 const NumberWords g_english_words{"minus ", " point ", " dot ", g_digit_words, integer_to_english};
 const NumberWords g_spanish_words{"menos ", " punto ", " punto ", g_es_below_thirty, integer_to_spanish};
+const NumberWords g_german_words{"minus ", " komma ", " punkt ", g_de_below_twenty, integer_to_german};
 
 bool pad_before(const std::string& result) {
     if (result.empty()) return false;
@@ -195,6 +258,7 @@ bool pad_after(const std::string& text, size_t match_end) {
 std::pair<std::string, bool> spoken_number(const std::string& match, NumberLanguage language,
                                            unsigned char resolved_script) {
     if (language == NumberLanguage::Spanish) return {read_number(match, g_spanish_words), true};
+    if (language == NumberLanguage::German) return {read_number(match, g_german_words), true};
     const bool english = language == NumberLanguage::English || (language == NumberLanguage::Auto && resolved_script == 1);
     if (english) return {read_number(match, g_english_words), true};
     return {BasicStringUtil::NumberToChinese(match), false};

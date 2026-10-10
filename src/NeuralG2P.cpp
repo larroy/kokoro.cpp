@@ -1,5 +1,6 @@
 #include "NeuralG2P.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -9,21 +10,10 @@
 
 namespace {
 
-// Symbol tables from g2p_en/g2p.py; indices must match the trained embeddings.
-constexpr int GRAPHEME_UNK = 1, GRAPHEME_EOS = 2, GRAPHEME_A = 3, NUM_GRAPHEMES = 29;
+// Special indices shared by g2p_en/g2p.py and g2p_de/g2p.py.
+constexpr int GRAPHEME_UNK = 1, GRAPHEME_EOS = 2, FIRST_REAL_GRAPHEME = 3;
 constexpr int PHONEME_BOS = 2, PHONEME_EOS = 3, FIRST_REAL_PHONEME = 4;
 constexpr int MAX_DECODE_STEPS = 20;
-
-const char* const PHONEMES[] = {
-    "<pad>", "<unk>", "<s>", "</s>",
-    "AA0", "AA1", "AA2", "AE0", "AE1", "AE2", "AH0", "AH1", "AH2", "AO0",
-    "AO1", "AO2", "AW0", "AW1", "AW2", "AY0", "AY1", "AY2", "B", "CH", "D", "DH",
-    "EH0", "EH1", "EH2", "ER0", "ER1", "ER2", "EY0", "EY1", "EY2", "F", "G", "HH",
-    "IH0", "IH1", "IH2", "IY0", "IY1", "IY2", "JH", "K", "L",
-    "M", "N", "NG", "OW0", "OW1", "OW2", "OY0", "OY1", "OY2", "P", "R", "S", "SH", "T", "TH",
-    "UH0", "UH1", "UH2", "UW", "UW0", "UW1", "UW2", "V", "W", "Y", "Z", "ZH",
-};
-constexpr int NUM_PHONEMES = sizeof(PHONEMES) / sizeof(PHONEMES[0]);
 
 struct Tensor {
     std::vector<uint32_t> shape;
@@ -56,7 +46,20 @@ std::vector<float> project(const Tensor& emb, const Tensor& w, const Tensor& b) 
 
 float sigmoid(float x) { return 1.0f / (1.0f + std::exp(-x)); }
 
+// Byte length of the UTF-8 character whose lead byte is `lead`; continuation/invalid bytes count as 1.
+size_t utf8_char_length(unsigned char lead) {
+    if ((lead & 0xF8) == 0xF0) return 4;
+    if ((lead & 0xF0) == 0xE0) return 3;
+    if ((lead & 0xE0) == 0xC0) return 2;
+    return 1;
+}
+
 }  // namespace
+
+NeuralG2P::NeuralG2P(G2PSymbols symbols) : symbols_(std::move(symbols)) {
+    for (size_t i = FIRST_REAL_GRAPHEME; i < symbols_.graphemes.size(); ++i)
+        grapheme_ids_.emplace(symbols_.graphemes[i], static_cast<int>(i));
+}
 
 bool NeuralG2P::load(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
@@ -101,13 +104,15 @@ bool NeuralG2P::load(const std::string& path) {
     const uint32_t emb = t["enc_emb"].shape.back();
     const uint32_t h = t["enc_w_hh"].shape.back();
     const uint32_t g = 3 * h;
+    const auto graphemes = static_cast<uint32_t>(symbols_.graphemes.size());
+    const auto phonemes = static_cast<uint32_t>(symbols_.phonemes.size());
     const bool shapes_ok =
-        has_shape(t["enc_emb"], {NUM_GRAPHEMES, emb}) && has_shape(t["dec_emb"], {NUM_PHONEMES, emb}) &&
+        has_shape(t["enc_emb"], {graphemes, emb}) && has_shape(t["dec_emb"], {phonemes, emb}) &&
         has_shape(t["enc_w_ih"], {g, emb}) && has_shape(t["dec_w_ih"], {g, emb}) &&
         has_shape(t["enc_w_hh"], {g, h}) && has_shape(t["dec_w_hh"], {g, h}) &&
         has_shape(t["enc_b_ih"], {g}) && has_shape(t["enc_b_hh"], {g}) && has_shape(t["dec_b_ih"], {g}) &&
-        has_shape(t["dec_b_hh"], {g}) && has_shape(t["fc_w"], {NUM_PHONEMES, h}) &&
-        has_shape(t["fc_b"], {NUM_PHONEMES});
+        has_shape(t["dec_b_hh"], {g}) && has_shape(t["fc_w"], {phonemes, h}) &&
+        has_shape(t["fc_b"], {phonemes});
     if (!shapes_ok) {
         std::cerr << "[NeuralG2P] Warning: unexpected tensor shapes in " << path << std::endl;
         return false;
@@ -150,8 +155,11 @@ std::vector<std::string> NeuralG2P::predict(const std::string& word) const {
     const size_t G = static_cast<size_t>(3) * H;
     std::vector<float> h(H, 0.0f), gh(G);
 
-    for (char c : word) {
-        const int idx = (c >= 'a' && c <= 'z') ? GRAPHEME_A + (c - 'a') : GRAPHEME_UNK;
+    std::string ch;  // one UTF-8 character; short-string storage, no heap allocation
+    for (size_t i = 0; i < word.size(); i += ch.size()) {
+        ch.assign(word, i, std::min(utf8_char_length(static_cast<unsigned char>(word[i])), word.size() - i));
+        const auto it = grapheme_ids_.find(ch);
+        const size_t idx = it == grapheme_ids_.end() ? GRAPHEME_UNK : static_cast<size_t>(it->second);
         gru_step(&enc_in_[idx * G], enc_w_hh_, enc_b_hh_, h, gh);
     }
     gru_step(&enc_in_[GRAPHEME_EOS * G], enc_w_hh_, enc_b_hh_, h, gh);
@@ -161,7 +169,7 @@ std::vector<std::string> NeuralG2P::predict(const std::string& word) const {
         gru_step(&dec_in_[prev * G], dec_w_hh_, dec_b_hh_, h, gh);
         int best = 0;
         float best_logit = -INFINITY;
-        for (int p = 0; p < NUM_PHONEMES; ++p) {
+        for (int p = 0; p < static_cast<int>(symbols_.phonemes.size()); ++p) {
             const float* wr = &fc_w_[static_cast<size_t>(p) * H];
             float acc = fc_b_[p];
             for (int k = 0; k < H; ++k) acc += wr[k] * h[k];
@@ -171,7 +179,7 @@ std::vector<std::string> NeuralG2P::predict(const std::string& word) const {
             }
         }
         if (best == PHONEME_EOS) break;
-        if (best >= FIRST_REAL_PHONEME) out.emplace_back(PHONEMES[best]);
+        if (best >= FIRST_REAL_PHONEME) out.push_back(symbols_.phonemes[best]);
         prev = best;
     }
     return out;

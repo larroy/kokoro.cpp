@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare kokoro.cpp's G2P (g2p_dump) against espeak-ng as used upstream (espeak_oracle.py).
 
-Run: uv run --group eval python eval_bench/compare_g2p.py [--language es] [--g2p-dump PATH] [--report PATH]
+Run: uv run --group eval python eval_bench/compare_g2p.py [--language es|de] [--g2p-dump PATH] [--report PATH]
 Exit code 1 when a mismatch is not listed in the language's known-diffs file.
 """
 
@@ -25,6 +25,7 @@ class BenchLanguage:
     espeak: str
     corpus: Path
     known_diffs: Path
+    espeak_fixups: tuple[tuple[str, str], ...] = ()  # (espeak symbol, Kokoro symbol) replaced before comparing
 
 
 @dataclass(frozen=True)
@@ -36,7 +37,12 @@ class LineResult:
     known: str | None
 
 
-LANGUAGES = {"es": BenchLanguage("es", "es", BENCH / "corpus" / "es.txt", BENCH / "corpus" / "es_known_diffs.tsv")}
+LANGUAGES = {
+    "es": BenchLanguage("es", "es", BENCH / "corpus" / "es.txt", BENCH / "corpus" / "es_known_diffs.tsv"),
+    # Kokoro's vocab has no ʏ; the German G2P writes y.
+    "de": BenchLanguage("de", "de", BENCH / "corpus" / "de.txt", BENCH / "corpus" / "de_known_diffs.tsv",
+                        (("ʏ", "y"),)),
+}
 
 
 def levenshtein(a: str, b: str) -> int:
@@ -48,6 +54,12 @@ def levenshtein(a: str, b: str) -> int:
             current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (ca != cb)))
         previous = current
     return previous[-1]
+
+
+def apply_fixups(phonemes: str, fixups: tuple[tuple[str, str], ...]) -> str:
+    for old, new in fixups:
+        phonemes = phonemes.replace(old, new)
+    return phonemes
 
 
 def content_lines(path: Path) -> list[str]:
@@ -74,8 +86,8 @@ def find_dump(option: Path | None) -> Path:
 
 
 def kokoro_phonemes(dump: Path, code: str, lines: list[str]) -> list[str]:
-    result = subprocess.run([str(dump), code], input="\n".join(lines) + "\n", capture_output=True, text=True,
-                            encoding="utf-8", check=True)
+    result = subprocess.run([str(dump), code, str(ROOT / "dict")], input="\n".join(lines) + "\n",
+                            capture_output=True, text=True, encoding="utf-8", check=True)
     output = result.stdout.split("\n")[:-1]
     if len(output) != len(lines):
         raise click.ClickException(f"g2p_dump printed {len(output)} lines for {len(lines)} inputs")
@@ -118,7 +130,7 @@ def main(code: str, dump: Path | None, report: Path | None) -> None:
     lang = LANGUAGES[code]
     lines = content_lines(lang.corpus)
     kokoro = kokoro_phonemes(find_dump(dump), lang.code, lines)
-    espeak = [p.replace("ˌ", "") for p in espeak_phonemes(lines, lang.espeak)]
+    espeak = [apply_fixups(p.replace("ˌ", ""), lang.espeak_fixups) for p in espeak_phonemes(lines, lang.espeak)]
     results = compare(lines, espeak, kokoro, load_known_diffs(lang.known_diffs))
     print_results(results)
     if report is not None:

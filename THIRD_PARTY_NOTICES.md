@@ -34,6 +34,20 @@ Each component remains under its own license; the full license texts are in the 
 - License text: `dict/g2p_en.LICENSE.txt`
 - File: `dict/g2p_en.weights`
 
+### g2p_de model weights
+
+- Source: https://github.com/gooofy/g2p_de
+- License: Apache License 2.0
+- License text: `dict/g2p_de.LICENSE.txt`
+- File: `dict/g2p_de.weights`
+
+### German MFA dictionary v3.0.0
+
+- Source: https://mfa-models.readthedocs.io/en/latest/dictionary/German/German%20MFA%20dictionary%20v3_0_0.html
+  (McAuliffe & Sonderegger 2024), redistributed via https://github.com/gooofy/g2p_de
+- License: Creative Commons Attribution 4.0 (CC BY 4.0)
+- File: `dict/german_mfa.dict`
+
 ### pinyin-data
 
 - Source: https://github.com/mozillazg/pinyin-data
@@ -53,4 +67,7 @@ Each component remains under its own license; the full license texts are in the 
 
 - Source: https://huggingface.co/hexgrad/Kokoro-82M and https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh
 - License: Apache License 2.0
+- German model: https://huggingface.co/Godelaune/kikiri-tts (ONNX export
+  https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin), Apache License 2.0
+- German voices: https://huggingface.co/cstr/kokoro-voices-GGUF, Apache License 2.0
 - The model (`*.onnx`) and voice (`voices-*.bin`) files are not packaged; users download them separately.

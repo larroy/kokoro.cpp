@@ -1,8 +1,8 @@
 #pragma once
 #include <string>
 
-// Spanish is only used when forced: normalize_numbers never resolves Auto to Spanish.
-enum class NumberLanguage { Auto, English, Chinese, Spanish };
+// Spanish and German are only used when forced: normalize_numbers never resolves Auto to them.
+enum class NumberLanguage { Auto, English, Chinese, Spanish, German };
 
 // Replaces every number ([-+]?\d+(?:\.\d+)*) in UTF-8 `text` with words in `language`.
 // Auto: language of the nearest ASCII letter or CJK character before the number; if none, of the

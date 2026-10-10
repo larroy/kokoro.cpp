@@ -19,7 +19,9 @@ import zipfile
 import os
 import re
 from pathlib import Path
+from array import array
 from dataclasses import dataclass
+from typing import Callable
 
 import click
 
@@ -113,7 +115,7 @@ CUDA_RUNTIME_LIBRARIES = {
 
 @dataclass(frozen=True)
 class Artifact:
-    name: str  # file name in models/ (or voice name for SPANISH_VOICES)
+    name: str  # file name in models/ (or voice name inside a VoicePack)
     url: str
     sha256: str
 
@@ -127,7 +129,22 @@ ARTIFACTS = (
     Artifact("kokoro-v1.0.onnx",
              "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx",
              "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5"),
+    Artifact("kokoro-de.onnx",
+             "https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin/resolve/"
+             "a1cba7fbf0e72fbae38f0a3a48ce0dc8e6077804/kokoro-martin.onnx",
+             "c302f1d8bc7adf40a842cb550e18c39a5026bdb1afdd29dbb700b501cb49276b"),
 )
+
+
+@dataclass(frozen=True)
+class VoicePack:
+    name: str                          # file name in models/
+    sha256: str                        # of the assembled pack
+    voices: tuple[Artifact, ...]       # Artifact.name = voice name; sorted by name
+    suffix: str                        # download file suffix
+    load: Callable[[Path], array]      # voice_tool loader for one downloaded voice
+
+
 SPANISH_VOICES_URL = ("https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/"
                       "1939ad2a8e416c0acfeecc08a694d14ef25f2231/voices")
 SPANISH_VOICES = (
@@ -138,8 +155,22 @@ SPANISH_VOICES = (
     Artifact("em_santa", f"{SPANISH_VOICES_URL}/em_santa.bin",
              "ad43b774e1ca24d05c6161297d8aeb770ac3d29bb95daf516727af5f7d543683"),
 )
-SPANISH_PACK_NAME = "voices-v1.0-es.bin"  # built locally from SPANISH_VOICES
-SPANISH_PACK_SHA256 = "cdaf0ecca101f3738763f6e3a13b63d46137909b8ebcf9de2be4ef2a73014c52"
+SPANISH_PACK = VoicePack("voices-v1.0-es.bin", "cdaf0ecca101f3738763f6e3a13b63d46137909b8ebcf9de2be4ef2a73014c52",
+                         SPANISH_VOICES, ".bin", voice_tool.load_raw)
+GERMAN_VOICES_URL = "https://huggingface.co/cstr/kokoro-voices-GGUF/resolve/1c98db113c69e3feef9644cf0aaec5c0bea02a8e"
+GERMAN_VOICES = (
+    Artifact("df_eva", f"{GERMAN_VOICES_URL}/kokoro-voice-df_eva.gguf",
+             "3942404617a4a77728a46b54ead8bbc4dd799128784e071ee37c941a08acc674"),
+    Artifact("df_victoria", f"{GERMAN_VOICES_URL}/kokoro-voice-df_victoria.gguf",
+             "ef7b5021f1f2c77c12d4423a22a31b214c3bfc7eb36c615ca54d5f13ccdba8d1"),
+    Artifact("dm_bernd", f"{GERMAN_VOICES_URL}/kokoro-voice-dm_bernd.gguf",
+             "b2c075a3d78b35d169ae0839228705a6aa05c0d66cabe9d5f4a841f32a4b2050"),
+    Artifact("dm_martin", f"{GERMAN_VOICES_URL}/kokoro-voice-dm_martin.gguf",
+             "7eda2f6da5571e041b2d737f73bad4fdcebd939759de4d1b075b841543e53a29"),
+)
+GERMAN_PACK = VoicePack("voices-de.bin", "98e7a1f718167e632e252b71f1aef159cbf5d68c54811e6a73a8fe82c5e91224",
+                        GERMAN_VOICES, ".gguf", voice_tool.load_gguf)
+VOICE_PACKS = (SPANISH_PACK, GERMAN_PACK)
 
 ORT_GIT_URL = "https://github.com/microsoft/onnxruntime.git"
 ORT_SRC_DIR = ROOT / "third_party" / "onnxruntime-src"
@@ -381,26 +412,27 @@ def install_artifacts(force: bool) -> None:
             click.echo(f"{dest.relative_to(ROOT)} is up to date")
             continue
         download(artifact.url, dest, artifact.sha256)
-    install_spanish_voices(force)
+    for pack in VOICE_PACKS:
+        install_voice_pack(pack, force)
 
 
-def install_spanish_voices(force: bool) -> None:
-    """Build the Spanish voices file from the onnx-community raw float32 voices."""
-    dest = MODELS_DIR / SPANISH_PACK_NAME
-    if not force and dest.is_file() and sha256(dest) == SPANISH_PACK_SHA256:
+def install_voice_pack(pack: VoicePack, force: bool) -> None:
+    """Build a voices file from separately downloaded voices."""
+    dest = MODELS_DIR / pack.name
+    if not force and dest.is_file() and sha256(dest) == pack.sha256:
         click.echo(f"{dest.relative_to(ROOT)} is up to date")
         return
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp = Path(tmp_dir)
-        for voice in SPANISH_VOICES:
-            download(voice.url, tmp / f"{voice.name}.bin", voice.sha256)
-        voices = {v.name: voice_tool.load_raw(tmp / f"{v.name}.bin") for v in SPANISH_VOICES}
+        for voice in pack.voices:
+            download(voice.url, tmp / f"{voice.name}{pack.suffix}", voice.sha256)
+        voices = {v.name: pack.load(tmp / f"{v.name}{pack.suffix}") for v in pack.voices}
     part = dest.with_name(dest.name + ".part")
     voice_tool.save_voices(part, voices)
     actual = sha256(part)
-    if actual != SPANISH_PACK_SHA256:
+    if actual != pack.sha256:
         part.unlink()
-        raise click.ClickException(f"Checksum mismatch for {dest.name}: expected {SPANISH_PACK_SHA256}, got {actual}")
+        raise click.ClickException(f"Checksum mismatch for {dest.name}: expected {pack.sha256}, got {actual}")
     part.replace(dest)
     click.echo(f"Wrote {dest.relative_to(ROOT)}")
 

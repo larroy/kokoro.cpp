@@ -8,7 +8,7 @@ A high-performance, lightweight C++ inference implementation of the [Kokoro](htt
 ## Features
 
 - 🚀 **Fast inference**: powered by ONNX Runtime.
-- 🌏 **Multilingual**: native support for Chinese and English; Spanish (Castilian) with the v1.0 model.
+- 🌏 **Multilingual**: native support for Chinese and English; Spanish (Castilian) with the v1.0 model; German with a German fine-tune.
 
 ## Requirements
 
@@ -27,7 +27,8 @@ This downloads, verifying SHA-256 checksums:
 
 - the prebuilt [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU; the CUDA build on supported NVIDIA GPUs, see below) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
 - the model `kokoro-v1.1-zh.onnx` and the voice pack `voices-v1.1-zh.bin` from this repository's [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) into `models/`;
-- the Kokoro-82M v1.0 model `kokoro-v1.0.onnx` from [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), and the Spanish voices `ef_dora`, `em_alex` and `em_santa` from [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), packed into `models/voices-v1.0-es.bin`.
+- the Kokoro-82M v1.0 model `kokoro-v1.0.onnx` from [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), and the Spanish voices `ef_dora`, `em_alex` and `em_santa` from [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), packed into `models/voices-v1.0-es.bin`;
+- the German fine-tune `kokoro-de.onnx` from [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin), and the German voices `df_eva`, `df_victoria`, `dm_bernd` and `dm_martin` from [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF), packed into `models/voices-de.bin`.
 
 Files that are already present and up to date are skipped; `--force` downloads them again. The ONNX Runtime version and checksums are pinned in `bootstrap.py`. To use another ONNX Runtime installation instead, skip `configure` and pass `-DONNXRUNTIME_ROOT=/path/to/onnxruntime` to CMake.
 
@@ -84,8 +85,8 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 | `-d, --dict <dir>` | dictionary directory (default: `dict`) |
 | `-v, --voice <name>` | voice (default: `af_maple`); English voices: `af_maple`, `af_sol`, `bf_vale`; Chinese voices: `zf_*`, `zm_*` |
 | `-s, --speed <rate>` | speaking rate, > 0 (default: `1.0`) |
-| `--lang <auto\|en\|zh\|es>` | language for reading numbers (default: `auto`) |
-| `--language <auto\|zh\|en\|es>` | text language; `auto`: `es` for `ef_*`/`em_*`, `en` for `af_`/`am_`/`bf_`/`bm_*` voices, else `zh` (Chinese/English) (default: `auto`) |
+| `--lang <auto\|en\|zh\|es\|de>` | language for reading numbers (default: `auto`) |
+| `--language <auto\|zh\|en\|es\|de>` | text language; `auto`: `es` for `ef_*`/`em_*`, `de` for `df_*`/`dm_*`, `en` for `af_`/`am_`/`bf_`/`bm_*` voices, else `zh` (Chinese/English) (default: `auto`) |
 | `-o, --output <path>` | output WAV file (default: `output.wav`) |
 | `-p, --phonemes` | `<text>` is a phoneme string; skip G2P |
 | `--phonemize` | print the phonemes for `<text>` instead of synthesizing |
@@ -93,8 +94,8 @@ Run the `kokoro` command-line tool from the project root (the defaults point at 
 
 To add your own voices (blends, imported `.pt` tensors), see [docs/adding-voices.md](docs/adding-voices.md).
 
-The rule-based Spanish G2P is checked against espeak-ng with
-`uv run --group eval python eval_bench/compare_g2p.py` (needs a built `g2p_dump`).
+The Spanish and German G2Ps are checked against espeak-ng with
+`uv run --group eval python eval_bench/compare_g2p.py --language es|de` (needs a built `g2p_dump`).
 
 ### Example
 
@@ -111,6 +112,15 @@ Spanish (voices `ef_dora`, `em_alex`, `em_santa`; `ef_*`/`em_*` voices select th
     "Hola, ¿cómo estás? Tengo 25 años."
 ./build/kokoro -m models/kokoro-v1.0.onnx --voices models/voices-v1.0-es.bin --language es --phonemize "Tengo 25 años."
 # tˈɛŋɡo βAntiθˈinko ˈaɲos.
+```
+
+German (voices `df_eva`, `df_victoria`, `dm_bernd`, `dm_martin`; `df_*`/`dm_*` voices select the German G2P automatically):
+
+```bash
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin -v dm_martin -o hallo.wav \
+    "Guten Tag, wie geht es dir?"
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin --language de --phonemize "Ich habe 1.000 Euro."
+# ɪç hɑːbə ˈIntWzənt ˈɔørɔ.
 ```
 
 Output is a mono 32-bit float WAV at 24 kHz. Exit status is 0 on success, 1 on a library error, and 2 on a usage error.
@@ -183,7 +193,7 @@ English words are converted to phonemes in the following order (output uses the 
 `g2p_en.weights` is generated from g2p_en's `checkpoint20.npz` (numpy not required):
 
 ```bash
-python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
+python scripts/export_g2p.py checkpoint20.npz dict/g2p_en.weights
 ```
 
 ## Spanish loanwords
@@ -201,6 +211,7 @@ accent on the stressed vowel; sounds Spanish spelling lacks are written as IPA (
 - `src/Kokoro.cpp/h`: main TTS class (internal).
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
 - `src/SpanishG2P.cpp/h`: rule-based Spanish G2P (espeak-ng `es` conventions).
+- `src/german/`: German G2P (MFA dictionary, compound splitting, g2p_de neural fallback; espeak-ng `de` conventions).
 - `eval_bench/`: G2P evaluation against espeak-ng (`g2p_dump`, `compare_g2p.py`, corpora).
 - `tests/`: library tests (run with `ctest`); `tests/python/`: tests for the Python tools (run with `uv run pytest`).
 - `dotnet/`, `packaging/`: .NET wrapper (`Larroy.Kokoro`) and the scripts that build its NuGet packages.
@@ -223,7 +234,7 @@ MIT
 ## 特性
 
 - 🚀 **快速推理**：由 ONNX Runtime 驱动。
-- 🌏 **多语言**：原生支持中文和英文；使用 v1.0 模型支持西班牙语（卡斯蒂利亚口音）。
+- 🌏 **多语言**：原生支持中文和英文；使用 v1.0 模型支持西班牙语（卡斯蒂利亚口音）；使用德语微调模型支持德语。
 
 ## 依赖环境
 
@@ -242,7 +253,8 @@ uv run bootstrap.py configure
 
 - 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2（CPU 版；受支持的 NVIDIA GPU 上为 CUDA 版，见下文），放入 `third_party/onnxruntime/`；
 - 模型 `kokoro-v1.1-zh.onnx` 和语音包 `voices-v1.1-zh.bin`，来自本仓库的 [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files)，放入 `models/`；
-- Kokoro-82M v1.0 模型 `kokoro-v1.0.onnx`（来自 [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)），以及西班牙语语音 `ef_dora`、`em_alex`、`em_santa`（来自 [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)），打包为 `models/voices-v1.0-es.bin`。
+- Kokoro-82M v1.0 模型 `kokoro-v1.0.onnx`（来自 [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)），以及西班牙语语音 `ef_dora`、`em_alex`、`em_santa`（来自 [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)），打包为 `models/voices-v1.0-es.bin`；
+- 德语微调模型 `kokoro-de.onnx`（来自 [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin)），以及德语语音 `df_eva`、`df_victoria`、`dm_bernd`、`dm_martin`（来自 [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF)），打包为 `models/voices-de.bin`。
 
 已存在且校验一致的文件会被跳过；`--force` 强制重新下载。ONNX Runtime 版本和校验值固定在 `bootstrap.py` 中。如需使用其他 ONNX Runtime，可跳过 `configure`，并向 CMake 传入 `-DONNXRUNTIME_ROOT=/path/to/onnxruntime`。
 
@@ -299,8 +311,8 @@ Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` �
 | `-d, --dict <目录>` | 词典目录（默认：`dict`） |
 | `-v, --voice <名称>` | 语音（默认：`af_maple`）；英文语音：`af_maple`、`af_sol`、`bf_vale`；中文语音：`zf_*`、`zm_*` |
 | `-s, --speed <语速>` | 语速，须 > 0（默认：`1.0`） |
-| `--lang <auto\|en\|zh\|es>` | 数字朗读语言（默认：`auto`） |
-| `--language <auto\|zh\|en\|es>` | 文本语言；`auto`：`ef_*`/`em_*` 语音用西班牙语，`af_`/`am_`/`bf_`/`bm_*` 语音用英语，否则中文/英文（默认：`auto`） |
+| `--lang <auto\|en\|zh\|es\|de>` | 数字朗读语言（默认：`auto`） |
+| `--language <auto\|zh\|en\|es\|de>` | 文本语言；`auto`：`ef_*`/`em_*` 语音用西班牙语，`df_*`/`dm_*` 语音用德语，`af_`/`am_`/`bf_`/`bm_*` 语音用英语，否则中文/英文（默认：`auto`） |
 | `-o, --output <路径>` | 输出 WAV 文件（默认：`output.wav`） |
 | `-p, --phonemes` | `<文本>` 为音素串，跳过 G2P |
 | `--phonemize` | 输出 `<文本>` 的音素而不合成 |
@@ -323,6 +335,15 @@ Python 工具的测试位于 `tests/python/`：运行 `uv run pytest`。`.pt` �
     "Hola, ¿cómo estás? Tengo 25 años."
 ./build/kokoro -m models/kokoro-v1.0.onnx --voices models/voices-v1.0-es.bin --language es --phonemize "Tengo 25 años."
 # tˈɛŋɡo βAntiθˈinko ˈaɲos.
+```
+
+德语（语音 `df_eva`、`df_victoria`、`dm_bernd`、`dm_martin`；`df_*`/`dm_*` 语音会自动使用德语 G2P）：
+
+```bash
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin -v dm_martin -o hallo.wav \
+    "Guten Tag, wie geht es dir?"
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin --language de --phonemize "Ich habe 1.000 Euro."
+# ɪç hɑːbə ˈIntWzənt ˈɔørɔ.
 ```
 
 输出为 24 kHz 单声道 32 位浮点 WAV。成功时退出码为 0，库错误为 1，用法错误为 2。
@@ -394,7 +415,7 @@ dotnet run --project dotnet/examples/Kokoro.Interactive -c Release -- --device c
 `g2p_en.weights` 由 g2p_en 的 `checkpoint20.npz` 生成（无需 numpy）：
 
 ```bash
-python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
+python scripts/export_g2p.py checkpoint20.npz dict/g2p_en.weights
 ```
 
 ## 项目结构
@@ -405,6 +426,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/ZHFrontend.cpp/h`: 中文前端（G2P、变调）。
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: 英文 G2P（词典查询与神经网络预测）。
 - `src/SpanishG2P.cpp/h`: 基于规则的西班牙语 G2P（遵循 espeak-ng `es` 约定）。
+- `src/german/`: 德语 G2P（MFA 词典、复合词拆分、g2p_de 神经网络回退；遵循 espeak-ng `de` 约定）。
 - `eval_bench/`: 与 espeak-ng 对比的 G2P 评测（`g2p_dump`、`compare_g2p.py`、语料）。
 - `tests/`: 库测试（使用 `ctest` 运行）；`tests/python/`：Python 工具的测试（使用 `uv run pytest` 运行）。
 - `dotnet/`, `packaging/`: .NET 封装（`Larroy.Kokoro`）及构建其 NuGet 包的脚本。
@@ -427,7 +449,7 @@ Implementación ligera y de alto rendimiento en C++ de la inferencia del modelo 
 ## Características
 
 - 🚀 **Inferencia rápida**: impulsada por ONNX Runtime.
-- 🌏 **Multilingüe**: soporte nativo de chino e inglés; español (castellano) con el modelo v1.0.
+- 🌏 **Multilingüe**: soporte nativo de chino e inglés; español (castellano) con el modelo v1.0; alemán con un modelo afinado para alemán.
 
 ## Requisitos
 
@@ -446,7 +468,8 @@ Descarga, verificando las sumas SHA-256:
 
 - el [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 precompilado (CPU; la build CUDA en GPUs NVIDIA compatibles, ver más abajo) para la plataforma actual (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) en `third_party/onnxruntime/`;
 - el modelo `kokoro-v1.1-zh.onnx` y el paquete de voces `voices-v1.1-zh.bin` del [release `voices_model_files`](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) de este repositorio en `models/`;
-- el modelo Kokoro-82M v1.0 `kokoro-v1.0.onnx` de [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), y las voces españolas `ef_dora`, `em_alex` y `em_santa` de [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), empaquetadas en `models/voices-v1.0-es.bin`.
+- el modelo Kokoro-82M v1.0 `kokoro-v1.0.onnx` de [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), y las voces españolas `ef_dora`, `em_alex` y `em_santa` de [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), empaquetadas en `models/voices-v1.0-es.bin`;
+- el modelo afinado para alemán `kokoro-de.onnx` de [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin), y las voces alemanas `df_eva`, `df_victoria`, `dm_bernd` y `dm_martin` de [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF), empaquetadas en `models/voices-de.bin`.
 
 Los archivos ya presentes y actualizados se omiten; `--force` los descarga de nuevo. La versión de ONNX Runtime y las sumas de verificación están fijadas en `bootstrap.py`. Para usar otra instalación de ONNX Runtime, omite `configure` y pasa `-DONNXRUNTIME_ROOT=/ruta/a/onnxruntime` a CMake.
 
@@ -501,10 +524,10 @@ Ejecuta la herramienta `kokoro` desde la raíz del proyecto (las rutas por defec
 | `-m, --model <ruta>` | archivo del modelo ONNX (por defecto: `models/kokoro-v1.1-zh.onnx`) |
 | `--voices <ruta>` | archivo de voces (por defecto: `models/voices-v1.1-zh.bin`) |
 | `-d, --dict <dir>` | directorio de diccionarios (por defecto: `dict`) |
-| `-v, --voice <nombre>` | voz (por defecto: `af_maple`); voces inglesas: `af_maple`, `af_sol`, `bf_vale`; chinas: `zf_*`, `zm_*`; españolas (modelo v1.0): `ef_dora`, `em_alex`, `em_santa` |
+| `-v, --voice <nombre>` | voz (por defecto: `af_maple`); voces inglesas: `af_maple`, `af_sol`, `bf_vale`; chinas: `zf_*`, `zm_*`; españolas (modelo v1.0): `ef_dora`, `em_alex`, `em_santa`; alemanas (modelo `kokoro-de.onnx`): `df_eva`, `df_victoria`, `dm_bernd`, `dm_martin` |
 | `-s, --speed <factor>` | velocidad del habla, > 0 (por defecto: `1.0`) |
-| `--lang <auto\|en\|zh\|es>` | idioma para leer los números (por defecto: `auto`) |
-| `--language <auto\|zh\|en\|es>` | idioma del texto; `auto`: español para las voces `ef_*`/`em_*`, inglés para `af_`/`am_`/`bf_`/`bm_*`, si no chino/inglés (por defecto: `auto`) |
+| `--lang <auto\|en\|zh\|es\|de>` | idioma para leer los números (por defecto: `auto`) |
+| `--language <auto\|zh\|en\|es\|de>` | idioma del texto; `auto`: español para las voces `ef_*`/`em_*`, alemán para `df_*`/`dm_*`, inglés para `af_`/`am_`/`bf_`/`bm_*`, si no chino/inglés (por defecto: `auto`) |
 | `-o, --output <ruta>` | archivo WAV de salida (por defecto: `output.wav`) |
 | `-p, --phonemes` | `<texto>` es una cadena de fonemas; omite el G2P |
 | `--phonemize` | imprime los fonemas de `<texto>` en lugar de sintetizar |
@@ -524,6 +547,15 @@ Español (castellano, fonemas en la convención `es` de espeak-ng; las voces `ef
     "El agua del río está fría."
 ./build/kokoro -m models/kokoro-v1.0.onnx --voices models/voices-v1.0-es.bin --language es --phonemize "Tengo 25 años."
 # tˈɛŋɡo βAntiθˈinko ˈaɲos.
+```
+
+Alemán (las voces `df_*`/`dm_*` activan el G2P alemán automáticamente):
+
+```bash
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin -v dm_martin -o hallo.wav \
+    "Guten Tag, wie geht es dir?"
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin --language de --phonemize "Ich habe 1.000 Euro."
+# ɪç hɑːbə ˈIntWzənt ˈɔørɔ.
 ```
 
 Chino e inglés:
@@ -558,7 +590,7 @@ kokoro_destroy(ctx);
 - Todas las cadenas, incluidas las rutas, son UTF-8. `dict_dir` es el directorio con `vocab.txt` y los diccionarios del G2P (`dict/` en este repositorio).
 - Los errores se devuelven como códigos `kokoro_status`; `kokoro_last_error()` devuelve el mensaje del hilo que llama.
 - `kokoro_voice_count` / `kokoro_voice_name` enumeran las voces, `kokoro_phonemize` devuelve la cadena de fonemas y `KOKORO_INPUT_PHONEMES` sintetiza fonemas directamente.
-- `kokoro_set_language(ctx, KOKORO_LANGUAGE_SPANISH)` fuerza el G2P español (también para `kokoro_phonemize`, que no recibe voz); `kokoro_set_number_language` elige cómo se leen los números.
+- `kokoro_set_language(ctx, KOKORO_LANGUAGE_SPANISH)` fuerza el G2P español (y `KOKORO_LANGUAGE_GERMAN` el alemán; también para `kokoro_phonemize`, que no recibe voz); `kokoro_set_number_language` elige cómo se leen los números.
 - Se pueden usar contextos distintos desde hilos distintos; un mismo contexto no debe usarse de forma concurrente.
 
 Instálala y úsala desde CMake:
@@ -618,7 +650,7 @@ Las palabras inglesas se convierten en fonemas en este orden (la salida usa el c
 `g2p_en.weights` se genera a partir de `checkpoint20.npz` de g2p_en (no requiere numpy):
 
 ```bash
-python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
+python scripts/export_g2p.py checkpoint20.npz dict/g2p_en.weights
 ```
 
 ## Estructura del proyecto
@@ -629,6 +661,7 @@ python scripts/export_g2p_en.py checkpoint20.npz dict/g2p_en.weights
 - `src/ZHFrontend.cpp/h`: frontend chino (G2P, sandhi tonal).
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: G2P inglés (consulta de diccionario y predicción neuronal).
 - `src/SpanishG2P.cpp/h`: G2P español basado en reglas (convención `es` de espeak-ng).
+- `src/german/`: G2P alemán (diccionario MFA, separación de compuestos, red neuronal g2p_de como respaldo; convención `de` de espeak-ng).
 - `eval_bench/`: evaluación del G2P frente a espeak-ng (`g2p_dump`, `compare_g2p.py`, corpus).
 - `tests/`: pruebas de la biblioteca (con `ctest`); `tests/python/`: pruebas de las herramientas de Python (con `uv run pytest`).
 - `dotnet/`, `packaging/`: wrapper de .NET (`Larroy.Kokoro`) y los scripts que generan sus paquetes NuGet.

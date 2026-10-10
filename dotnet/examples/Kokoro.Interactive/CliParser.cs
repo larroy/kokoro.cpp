@@ -20,8 +20,8 @@ internal static class CliParser
               --voices <path>   voices file (default: models/voices-v1.1-zh.bin)
           -d, --dict <dir>      dictionary directory (default: dict)
           -v, --voice <name>    initial voice (default: af_maple)
-              --lang <auto|en|zh|es>  language for reading numbers (default: auto)
-              --language <auto|zh|en|es>  text language; auto: es for ef_*/em_*, en for af_/am_/bf_/bm_* voices, else zh (default: auto)
+              --lang <auto|en|zh|es|de>  language for reading numbers (default: auto)
+              --language <auto|zh|en|es|de>  text language; auto: es for ef_*/em_*, de for df_*/dm_*, en for af_/am_/bf_/bm_* voices, else zh (default: auto)
           -s, --speed <rate>    initial speaking rate, > 0 (default: 1.0)
               --device <name>   auto, cpu or cuda (default: auto)
               --gpu-id <n>      CUDA device to use (default: 0)
@@ -134,10 +134,10 @@ internal static class CliParser
             : new ParseResult(null, $"invalid speed '{value}' (must be a number > 0)"),
         Opt.Lang => TryParseNumberLanguage(value, out var numberLanguage)
             ? new ParseResult(options with { NumberLanguage = numberLanguage }, null)
-            : new ParseResult(null, $"invalid number language '{value}' (must be auto, en, zh or es)"),
+            : new ParseResult(null, $"invalid number language '{value}' (must be auto, en, zh, es or de)"),
         Opt.Language => TryParseLanguage(value, out var language)
             ? new ParseResult(options with { Language = language }, null)
-            : new ParseResult(null, $"invalid language '{value}' (must be auto, zh, en or es)"),
+            : new ParseResult(null, $"invalid language '{value}' (must be auto, zh, en, es or de)"),
         Opt.Device => TryParseDevice(value, out var device)
             ? new ParseResult(options with { Device = device }, null)
             : new ParseResult(null, $"invalid device '{value}' (expected auto, cpu or cuda)"),
@@ -165,6 +165,9 @@ internal static class CliParser
             case "es":
                 language = KokoroNumberLanguage.Spanish;
                 return true;
+            case "de":
+                language = KokoroNumberLanguage.German;
+                return true;
             default:
                 language = default;
                 return false;
@@ -186,6 +189,9 @@ internal static class CliParser
                 return true;
             case "es":
                 language = KokoroLanguage.Spanish;
+                return true;
+            case "de":
+                language = KokoroLanguage.German;
                 return true;
             default:
                 language = default;

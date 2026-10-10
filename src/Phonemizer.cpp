@@ -3,6 +3,7 @@
 #include "chinese_english/ChineseEnglishPhonemizer.h"
 #include "chinese_english/JiebaProcessor.h"
 #include "english/EnglishPhonemizer.h"
+#include "german/GermanPhonemizer.h"
 #include "spanish/SpanishPhonemizer.h"
 
 namespace {
@@ -24,6 +25,8 @@ Phonemizer::Phonemizer(const PhonemizerConfig& config) {
     phonemizers_.emplace(G2PLanguage::English, std::make_unique<EnglishPhonemizer>(eng));
     phonemizers_.emplace(G2PLanguage::Spanish,
                          std::make_unique<SpanishPhonemizer>(SpanishLoanwords::load(d + config.es_loanwords)));
+    phonemizers_.emplace(G2PLanguage::German,
+                         std::make_unique<GermanPhonemizer>(d + config.de_dict, d + config.g2p_de_model));
 }
 
 Phonemizer::~Phonemizer() = default;

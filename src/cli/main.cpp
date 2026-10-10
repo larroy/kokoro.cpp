@@ -88,9 +88,9 @@ void print_usage(std::FILE* out) {
         "      --voices <path>   voices file (default: models/voices-v1.1-zh.bin)\n"
         "  -d, --dict <dir>      dictionary directory (default: dict)\n"
         "  -v, --voice <name>    voice to use (default: af_maple)\n"
-        "      --lang <auto|en|zh|es>  language for reading numbers (default: auto)\n"
-        "      --language <auto|zh|en|es>  text language; auto: es for ef_*/em_*, en for af_/am_/bf_/bm_* voices, "
-        "else zh (Chinese/English) (default: auto)\n"
+        "      --lang <auto|en|zh|es|de>  language for reading numbers (default: auto)\n"
+        "      --language <auto|zh|en|es|de>  text language; auto: es for ef_*/em_*, de for df_*/dm_*, en for "
+        "af_/am_/bf_/bm_* voices, else zh (Chinese/English) (default: auto)\n"
         "  -s, --speed <rate>    speaking rate, > 0 (default: 1.0)\n"
 "  -o, --output <path>   output WAV file (default: output.wav; unused with -i)\n"
         "      --device <name>   auto, cpu or cuda (default: auto)\n"
@@ -109,21 +109,23 @@ bool usage_error(const std::string& message) {
     return false;
 }
 
-// Maps the --lang value; returns false for anything but "auto", "en", "zh" or "es".
+// Maps the --lang value; returns false for anything but "auto", "en", "zh", "es" or "de".
 bool parse_number_language(const std::string& value, kokoro_number_language& language) {
     if (value == "auto") { language = KOKORO_NUMBERS_AUTO; return true; }
     if (value == "en") { language = KOKORO_NUMBERS_ENGLISH; return true; }
     if (value == "zh") { language = KOKORO_NUMBERS_CHINESE; return true; }
     if (value == "es") { language = KOKORO_NUMBERS_SPANISH; return true; }
+    if (value == "de") { language = KOKORO_NUMBERS_GERMAN; return true; }
     return false;
 }
 
-// Maps the --language value; returns false for anything but "auto", "zh", "en" or "es".
+// Maps the --language value; returns false for anything but "auto", "zh", "en", "es" or "de".
 bool parse_language(const std::string& value, kokoro_language& language) {
     if (value == "auto") { language = KOKORO_LANGUAGE_AUTO; return true; }
     if (value == "zh") { language = KOKORO_LANGUAGE_CHINESE_ENGLISH; return true; }
     if (value == "en") { language = KOKORO_LANGUAGE_ENGLISH; return true; }
     if (value == "es") { language = KOKORO_LANGUAGE_SPANISH; return true; }
+    if (value == "de") { language = KOKORO_LANGUAGE_GERMAN; return true; }
     return false;
 }
 
@@ -190,12 +192,12 @@ bool parse_args(const std::vector<std::string>& args, Options& opt) {
             case Opt::Voice: opt.voice = value; break;
             case Opt::Lang:
                 if (!parse_number_language(value, opt.number_language)) {
-                    return usage_error("invalid number language '" + value + "' (must be auto, en, zh or es)");
+                    return usage_error("invalid number language '" + value + "' (must be auto, en, zh, es or de)");
                 }
                 break;
             case Opt::Language:
                 if (!parse_language(value, opt.language)) {
-                    return usage_error("invalid language '" + value + "' (must be auto, zh, en or es)");
+                    return usage_error("invalid language '" + value + "' (must be auto, zh, en, es or de)");
                 }
                 break;
             case Opt::Output: opt.output = value; break;

@@ -87,8 +87,25 @@ private:
     }
 
     std::unordered_map<std::string, std::vector<std::string>> dict_;
-    NeuralG2P neural_;
+    NeuralG2P neural_{neural_symbols()};
     static constexpr size_t MAX_ACRONYM_LENGTH = 5;
+
+    // Symbol tables from g2p_en/g2p.py; indices must match the trained embeddings.
+    static G2PSymbols neural_symbols() {
+        G2PSymbols symbols;
+        symbols.graphemes = {"<pad>", "<unk>", "</s>"};
+        for (char c = 'a'; c <= 'z'; ++c) symbols.graphemes.emplace_back(1, c);
+        symbols.phonemes = {
+            "<pad>", "<unk>", "<s>", "</s>",
+            "AA0", "AA1", "AA2", "AE0", "AE1", "AE2", "AH0", "AH1", "AH2", "AO0",
+            "AO1", "AO2", "AW0", "AW1", "AW2", "AY0", "AY1", "AY2", "B", "CH", "D", "DH",
+            "EH0", "EH1", "EH2", "ER0", "ER1", "ER2", "EY0", "EY1", "EY2", "F", "G", "HH",
+            "IH0", "IH1", "IH2", "IY0", "IY1", "IY2", "JH", "K", "L",
+            "M", "N", "NG", "OW0", "OW1", "OW2", "OY0", "OY1", "OY2", "P", "R", "S", "SH", "T", "TH",
+            "UH0", "UH1", "UH2", "UW", "UW0", "UW1", "UW2", "V", "W", "Y", "Z", "ZH",
+        };
+        return symbols;
+    }
 
     // English letter names in ARPAbet, A..Z.
     inline static const std::vector<std::string> LETTER_NAMES[26] = {

@@ -1,5 +1,6 @@
 #include "SpanishG2P.h"
 
+#include "PhonemeText.h"
 #include "Utils.h"
 
 #include <algorithm>
@@ -33,8 +34,6 @@ struct Segment {
 
 const std::u16string kKeptPunct = u";:,.!?¿¡—…\"()“”";
 const std::u16string kPausePunct = u",.;:!?¿¡—…()";
-const std::u16string kNoSpaceBefore = u",.;:!?…)”";
-const std::u16string kNoSpaceAfter = u"(“¿¡";
 const std::array<std::u16string, 33> kUnstressed = {
     u"a",  u"al",  u"con", u"de",  u"del", u"e",  u"el",  u"en",  u"la", u"las", u"le", u"les",
     u"lo", u"los", u"me",  u"mi",  u"mis", u"ni", u"nos", u"o",   u"os", u"por", u"que", u"se",
@@ -388,19 +387,6 @@ std::u16string render_segment(const Segment& segment) {
     std::u16string out;
     for (const Unit& unit : segment.units) out += (unit.stressed ? u"ˈ" : u"") + unit.ipa;
     return merge_diphthongs(out);
-}
-
-// Drops spaces before closing / after opening punctuation, collapses runs and trims.
-std::u16string tidy_spaces(const std::u16string& text) {
-    std::u16string out;
-    for (size_t i = 0; i < text.size(); ++i) {
-        const char16_t c = text[i];
-        const bool drop = c == u' ' && (out.empty() || out.back() == u' ' || contains(kNoSpaceAfter, out.back()) ||
-                                        i + 1 == text.size() || contains(kNoSpaceBefore, text[i + 1]));
-        if (!drop) out += c;
-    }
-    while (!out.empty() && out.back() == u' ') out.pop_back();
-    return out;
 }
 
 }  // namespace

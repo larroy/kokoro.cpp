@@ -1,0 +1,39 @@
+# German G2P benchmark: everyday sentences covering compounds, prefixes, suffix stress, r vocalization and umlauts.
+Guten Tag, dies ist ein Test des deutschen Phonemizers.
+Die Sonne scheint heute sehr hell über der Stadt.
+Wir fahren morgen mit dem Zug nach Berlin.
+Ich habe keine Ahnung, wo meine Schlüssel sind.
+Das Wetter wird am Wochenende wahrscheinlich schlechter.
+Kannst du mir bitte das Salz geben?
+Der Hund läuft schnell durch den Garten.
+Meine Großmutter backt jeden Sonntag einen Kuchen.
+Die Universität liegt in der Nähe des Bahnhofs.
+Er versteht die Frage nicht.
+Wir müssen die Rechnung bis Freitag bezahlen.
+Die Kinder spielen fröhlich im Schnee.
+Haustürschlüssel und Fahrradschloss liegen auf dem Küchentisch.
+Ich möchte einen Kaffee mit Milch, bitte.
+Wie spät ist es jetzt?
+Am Abend gehen wir zusammen ins Kino.
+Die Regierung hat neue Gesetze beschlossen.
+Mein Bruder arbeitet als Ingenieur in München.
+Bitte schließen Sie die Tür hinter sich.
+Das Buch liegt auf dem Tisch neben der Lampe.
+Im Sommer fahren viele Familien an die Ostsee.
+Die Polizei sucht nach dem gestohlenen Fahrrad.
+Können Sie mir den Weg zum Bahnhof zeigen?
+Der Lehrer erklärt den Schülern die Aufgabe.
+Unsere Nachbarn haben einen kleinen Hund.
+Gestern Abend hat es stark geregnet.
+Die Wohnung hat drei Zimmer und einen Balkon.
+Ich verstehe nicht, warum er so wütend ist.
+Das Konzert beginnt um acht Uhr.
+Wir haben im Urlaub viele Fotos gemacht.
+Die Ärztin untersucht den Patienten gründlich.
+Der Zug hat leider zwanzig Minuten Verspätung.
+Frühstück gibt es zwischen sieben und zehn Uhr.
+Er hat seine Freundin zum Geburtstag überrascht.
+Die Studenten diskutieren über die Zukunft Europas.
+Vergiss nicht, die Blumen zu gießen.
+Das Fußballspiel endete unentschieden.
+Ich freue mich auf die Weihnachtsferien.

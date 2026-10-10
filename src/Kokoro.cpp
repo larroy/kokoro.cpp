@@ -182,6 +182,7 @@ G2PLanguage Kokoro::language_for(const std::string& voice_name) const {
     if (!kokoro_name) return G2PLanguage::ChineseEnglish;
     switch (voice_name[0]) {
         case 'e': return G2PLanguage::Spanish;
+        case 'd': return G2PLanguage::German;
         case 'a': case 'b': return G2PLanguage::English;
         default: return G2PLanguage::ChineseEnglish;
     }

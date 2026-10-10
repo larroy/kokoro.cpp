@@ -1,7 +1,8 @@
-"""Convert g2p_en's checkpoint20.npz into the binary format read by NeuralG2P.cpp.
+"""Convert a g2p_en checkpoint20.npz or g2p_de checkpoint_de.npz into the binary format read by NeuralG2P.cpp.
 
-The checkpoint comes from https://github.com/Kyubyong/g2p (Apache-2.0):
+The checkpoints come from https://github.com/Kyubyong/g2p and https://github.com/gooofy/g2p_de (both Apache-2.0):
     https://github.com/Kyubyong/g2p/raw/master/g2p_en/checkpoint20.npz
+    https://github.com/gooofy/g2p_de/raw/master/g2p_de/checkpoint_de.npz
 
 Standard library only (no numpy needed).
 
@@ -62,6 +63,6 @@ def export(npz_path, output_path):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python export_g2p_en.py <checkpoint20.npz> <output g2p_en.weights>")
+        print("Usage: python export_g2p.py <checkpoint.npz> <output.weights>")
         sys.exit(1)
     export(sys.argv[1], sys.argv[2])

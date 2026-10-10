@@ -75,18 +75,18 @@ public:
      */
     std::string phonemize(const std::string& text, G2PLanguage language);
 
-    // How G2P reads digits in later phonemize()/create() calls. An explicit language (English/Chinese/Spanish) wins
-    // in every phonemizer; Auto reads Spanish text's numbers in Spanish, English text's in English, and keeps the
-    // nearest-script rule for Chinese/English text.
+    // How G2P reads digits in later phonemize()/create() calls. An explicit language (English/Chinese/Spanish/German)
+    // wins in every phonemizer; Auto reads Spanish text's numbers in Spanish, German text's in German, English text's
+    // in English, and keeps the nearest-script rule for Chinese/English text.
     void set_number_language(NumberLanguage language);
 
     // Forces the G2P language for later create() calls by voice name; nullopt = auto (see language_for()).
-    // Number reading follows set_number_language(): an explicit number language also applies to Spanish and English
-    // text.
+    // Number reading follows set_number_language(): an explicit number language also applies to Spanish, German and
+    // English text.
     void set_language(std::optional<G2PLanguage> forced);
 
-    // The forced language if set; else by voice name: ef_/em_* Spanish, af_/am_/bf_/bm_* English, else
-    // ChineseEnglish. "" = no voice.
+    // The forced language if set; else by voice name: ef_/em_* Spanish, df_/dm_* German, af_/am_/bf_/bm_* English,
+    // else ChineseEnglish. "" = no voice.
     G2PLanguage language_for(const std::string& voice_name) const;
 
     /** \brief Synthesizes audio from text using a named voice.

@@ -12,7 +12,8 @@ There are three ways to get a new voice:
 3. [Make a voice from your own recordings](#3-a-voice-from-your-own-recordings). No official tool exists for this; see the notes below.
 
 For Spanish, see [Spanish voices](#spanish-voices) for commands and
-[Training a new Spanish voice](#training-a-new-spanish-voice) for the experimental training workflow.
+[Training a new Spanish voice](#training-a-new-spanish-voice) for the experimental training workflow. For German,
+see [German voices](#german-voices).
 
 ## What a voice is
 
@@ -200,6 +201,30 @@ See `src/spanish/SpanishG2P.cpp` and the existing G2P benchmark in `eval_bench/R
 Start with one target speaker and a frozen-model pack experiment evaluated on Spanish sentences. This tests
 whether useful additional voices are possible with the existing runtime before investing in full fine-tuning.
 
+## German voices
+
+The stock Kokoro models do not speak German, so `uv run bootstrap.py configure` installs a German fine-tune,
+`models/kokoro-de.onnx` ([Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin),
+the ONNX export of [Godelaune/kikiri-tts](https://huggingface.co/Godelaune/kikiri-tts)), and
+`models/voices-de.bin` with the four voices of
+[cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF): `df_eva`, `df_victoria`, `dm_bernd`
+and `dm_martin`. Bootstrap reads each voice's `voice.pack` tensor (`voice_tool.load_gguf`) and keeps the first 510
+rows; `df_eva` and `dm_bernd` have 512.
+
+```bash
+./build/kokoro -m models/kokoro-de.onnx --voices models/voices-de.bin \
+  -v dm_martin "Guten Tag, dies ist ein Test."
+```
+
+The model was fine-tuned on `dm_martin`, so that voice is in-distribution; the other three are approximations on
+the same weights. The model card for cstr/kokoro-voices-GGUF marks `df_eva` and `dm_bernd` as voices of real
+people (HUI/LibriVox narrators); keep that in mind before publishing audio made with them.
+
+Names beginning with `df_` or `dm_` select German phonemization automatically; use `--language de` to force it
+for another name. The German G2P (`src/german/`) reads words from the German MFA dictionary, splits compounds,
+and predicts out-of-dictionary words with the g2p_de neural model, then writes espeak-ng-style phonemes, which
+is what the German fine-tunes were trained on. Use `--lang de` to read numbers in German with another voice.
+
 ## Using the new voice
 
 Pass the new voices file with `--voices`:
@@ -219,10 +244,12 @@ kokoro_create("models/kokoro-v1.1-zh.onnx", "models/voices-custom.bin", "dict", 
 
 Follow the existing `<language><gender>_<name>` convention:
 
-- The language letter is `a` (American English), `b` (British English), `e` (Spanish), or `z` (Mandarin Chinese).
+- The language letter is `a` (American English), `b` (British English), `d` (German), `e` (Spanish), or `z`
+  (Mandarin Chinese).
 - The gender letter is `f` or `m`.
 
-In automatic language mode, `ef_`/`em_` names select Spanish G2P, `af_`/`am_`/`bf_`/`bm_` select English,
-and other names use Chinese/English phonemization by script. `--language es|en|zh` or the C API's
-`kokoro_set_language()` overrides this selection. `kokoro_phonemize()` has no voice argument, so select Spanish
-explicitly when using it. Naming a voice does not change the model weights or train an accent.
+In automatic language mode, `ef_`/`em_` names select Spanish G2P, `df_`/`dm_` select German,
+`af_`/`am_`/`bf_`/`bm_` select English, and other names use Chinese/English phonemization by script.
+`--language es|de|en|zh` or the C API's `kokoro_set_language()` overrides this selection. `kokoro_phonemize()` has
+no voice argument, so select Spanish or German explicitly when using it. Naming a voice does not change the model
+weights or train an accent.

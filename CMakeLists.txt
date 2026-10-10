@@ -110,7 +110,12 @@ add_library(kokoro_core STATIC
     src/chinese_english/PinyinFinder.cpp
     src/chinese_english/ToneSandhi.cpp
     src/chinese_english/ZHFrontend.cpp
-    src/english/NeuralG2P.cpp
+    src/NeuralG2P.cpp
+    src/PhonemeText.cpp
+    src/german/GermanG2P.cpp
+    src/german/GermanLexicon.cpp
+    src/german/GermanPhonemizer.cpp
+    src/german/GermanPronunciation.cpp
     src/spanish/SpanishG2P.cpp
     src/spanish/SpanishLoanwords.cpp
 )

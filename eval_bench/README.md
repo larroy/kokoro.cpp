@@ -6,12 +6,12 @@ Kokoro (misaki `EspeakG2P`) built the voices' training data.
 ## Contents
 
 - `g2p_dump.cpp` — CLI that reads lines on stdin and prints one phoneme string per line
-  (`g2p_dump <language>`, currently only `es`).
+  (`g2p_dump <language> [dict_dir]`, language `es` or `de`; `dict_dir` defaults to `dict`).
 - `compare_g2p.py` — runs `g2p_dump` and espeak-ng over the corpus, reports mismatches.
 - `espeak_oracle.py` — espeak-ng phonemization matching misaki's backend setup and
   post-processing, without depending on misaki.
-- `corpus/es.txt` — Spanish test corpus (comments with `#`, blank lines ignored).
-- `corpus/es_known_diffs.tsv` — accepted mismatches, one per line: `<text>\t<comment>`.
+- `corpus/es.txt`, `corpus/de.txt` — Spanish and German test corpora (comments with `#`, blank lines ignored).
+- `corpus/es_known_diffs.tsv`, `corpus/de_known_diffs.tsv` — accepted mismatches, one per line: `<text>\t<comment>`.
   A line in this file with zero distance is reported as a *stale known diff* and should be
   removed.
 
@@ -22,7 +22,7 @@ uv run bootstrap.py build                       # builds build/eval_bench/g2p_du
 uv run --group eval python eval_bench/compare_g2p.py
 ```
 
-Options: `--language es`, `--g2p-dump PATH`, `--report PATH` (TSV of every line with
+Options: `--language es|de`, `--g2p-dump PATH`, `--report PATH` (TSV of every line with
 `text, espeak, kokoro, distance, known` columns).
 
 The script locates `g2p_dump` under `build/eval_bench/` (or the `Release` variant on
@@ -30,6 +30,9 @@ Windows); pass `--g2p-dump` to override.
 
 espeak-ng is provided via Python packages (`espeakng_loader`, `phonemizer`), no system
 install needed.
+
+Secondary stress (`ˌ`) is removed from espeak-ng's output before comparing, as kokoro.cpp never writes it. For
+German, espeak-ng's `ʏ` is also compared as `y`: Kokoro's vocab has no `ʏ`, so the German G2P writes `y`.
 
 ## Exit status
 

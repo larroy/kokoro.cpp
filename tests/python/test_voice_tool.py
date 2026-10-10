@@ -159,3 +159,37 @@ def test_cli_import_pt_rejects_wrong_shape(tmp_path: Path, voices_file: Path) ->
     result = run_cli("import-pt", "--voices", voices_file, "--name", "x", "-o", tmp_path / "out.bin", pt_file)
     assert result.exit_code == 1
     assert "expected 510 x 256 = 130560 values, got 2560" in result.output
+
+
+def gguf_string(text: str) -> bytes:
+    data = text.encode("utf-8")
+    return struct.pack("<Q", len(data)) + data
+
+
+def write_gguf(path: Path, dims: tuple[int, ...], magic: bytes = b"GGUF") -> Path:
+    """GGUF voice pack with a string KV, general.alignment=32 and an F32 voice.pack tensor holding a ramp."""
+    kvs = (gguf_string("general.name") + struct.pack("<I", 8) + gguf_string("df_test")
+           + gguf_string("general.alignment") + struct.pack("<II", 4, 32))
+    info = (gguf_string("voice.pack") + struct.pack("<I", len(dims)) + struct.pack(f"<{len(dims)}Q", *dims)
+            + struct.pack("<IQ", 0, 0))
+    meta = magic + struct.pack("<IQQ", 3, 1, 2) + kvs + info
+    count = dims[0] * dims[1] * dims[2]
+    path.write_bytes(meta + bytes(-len(meta) % 32) + struct.pack(f"<{count}f", *range(count)))
+    return path
+
+
+def test_load_gguf_keeps_first_rows(tmp_path: Path) -> None:
+    path = write_gguf(tmp_path / "voice.gguf", (256, 1, 512))
+    assert voice_tool.load_gguf(path) == array("f", range(voice_tool.STYLE_LEN))
+
+
+def test_load_gguf_rejects_too_few_rows(tmp_path: Path) -> None:
+    path = write_gguf(tmp_path / "short.gguf", (256, 1, 509))
+    with pytest.raises(click.ClickException, match="voice.pack must be F32"):
+        voice_tool.load_gguf(path)
+
+
+def test_load_gguf_rejects_other_files(tmp_path: Path) -> None:
+    path = write_gguf(tmp_path / "bad.gguf", (256, 1, 512), magic=b"XXXX")
+    with pytest.raises(click.ClickException, match="not a GGUF file"):
+        voice_tool.load_gguf(path)

@@ -21,6 +21,8 @@ struct PhonemizerConfig {
     std::string user_en_dict = "user_en.dict";
     std::string g2p_en_model = "g2p_en.weights";
     std::string es_loanwords = "es_loanwords.tsv";  // optional; extends the built-in Spanish loanwords
+    std::string de_dict = "german_mfa.dict";
+    std::string g2p_de_model = "g2p_de.weights";
 };
 
 // Dispatches text to the PhonemizerBase implementation for a G2PLanguage.
