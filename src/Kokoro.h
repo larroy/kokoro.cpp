@@ -141,7 +141,39 @@ private:
     std::optional<G2PLanguage> forced_language_;  // nullopt: by voice name
     
     // Internal methods
+
+    /** \brief Creates the ONNX Runtime session and sets device().
+     *
+     *  Device selection: Cpu always builds a CPU session. Auto uses CUDA when this ONNX Runtime
+     *  build has the CUDAExecutionProvider, else CPU. Cuda requires CUDA support and never falls
+     *  back. A CUDA session that fails to initialize (for example, no usable GPU) falls back to CPU
+     *  with a warning on stderr under Auto, and rethrows under Cuda. The CUDA provider uses
+     *  cudnn_conv_algo_search=HEURISTIC because every chunk length is a new input shape.
+     *
+     *  \param model_path Path to the ONNX model file (UTF-8).
+     *  \param inference Where inference runs (device and GPU ordinal).
+     *
+     *  \throws std::runtime_error if the model file does not exist, or Cuda is requested and this
+     *          ONNX Runtime build has no CUDA support.
+     *  \throws Ort::Exception if session creation fails.
+     */
     void create_session(const std::string& model_path, const InferenceConfig& inference);
+
+    /** \brief Loads the voices file into voices_.
+     *
+     *  Reads the binary format written by scripts/export_voices.py and voice_tool.py: the magic
+     *  "VOIC", a little-endian uint32 version (1) and voice count, then per voice a little-endian
+     *  uint32 name length, the UTF-8 name, a uint32 float count, and that many little-endian
+     *  float32 values. A voice's values must be a nonzero multiple of STYLE_DIM (256) and are kept
+     *  as one vector of style rows (510 rows x 256 floats for the standard voices). Names are
+     *  case-sensitive; if a name appears twice, the later entry wins.
+     *
+     *  \param voices_path Path to the voices file (UTF-8).
+     *
+     *  \throws std::runtime_error if the file cannot be opened, has a wrong magic or version,
+     *          holds a voice whose float count is not a whole number of style rows, is truncated,
+     *          or holds no voices.
+     */
     void load_voices(const std::string& voices_path);
     
     std::pair<std::vector<float>, int> _create_audio(
