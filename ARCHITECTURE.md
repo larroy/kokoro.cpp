@@ -83,9 +83,11 @@ flowchart TD
    one UTF-8 phoneme string in Kokoro's symbol set.
 4. **Chunk.** `split_phonemes` (`src/PhonemeChunker.cpp`) splits at `.,!?;`, keeping each mark with the text before
    it, trims the segments, and packs them into chunks of at most `MAX_PHONEME_LENGTH` = 510 UTF-8 characters, counted
-   as `PhonemeEncoder` splits them (so at most 510 tokens). A segment over the limit is split at spaces. A space-free
+   as `PhonemeEncoder` splits them (so at most 510 tokens). Punctuation groups are packed whole; an oversized group
+   starts a new chunk before splitting at spaces, so an earlier punctuation boundary takes precedence. A space-free
    word over the limit (unpunctuated Chinese) is cut after its last tone mark (`→ ↗ ↘ ↓`) within the limit, else at
-   exactly 510 characters. Nothing is dropped.
+   exactly 510 characters. A cut that would strand trailing punctuation retreats to the preceding tone boundary, or
+   reserves the final phoneme and its tone if no earlier tone boundary exists. Nothing is dropped.
 5. **Encode.** `PhonemeEncoder::encode` maps each UTF-8 character to its id from `dict/vocab.txt` and **silently drops
    characters that are not in the vocab**. More than 510 tokens (unreachable after chunking) are capped at 510 with a
    `kokoro:` warning on stderr.

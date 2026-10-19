@@ -160,3 +160,47 @@ TEST_CASE("mixed_punctuation_and_long_stretches") {
     CHECK(std::none_of(chunks.begin(), chunks.end(), starts_with_punctuation));
     CHECK(strip_spaces(join(chunks)) == strip_spaces(input));
 }
+
+TEST_CASE("trailing_punctuation_keeps_the_final_toned_syllable") {
+    for (const std::string tone : {"→", "↗", "↘", "↓"}) {
+        for (const std::string punctuation : {".", "...", "!?"}) {
+            CAPTURE(tone);
+            CAPTURE(punctuation);
+            const std::string syllable = "ni" + tone;
+            const std::string input = repeat(syllable, 170) + punctuation;
+            const auto chunks = split_phonemes(input, kLimit);
+            CHECK(chunks == std::vector<std::string>{repeat(syllable, 169), syllable + punctuation});
+            CHECK(all_bounded(chunks));
+            CHECK(join(chunks) == input);
+            CHECK(std::all_of(chunks.begin(), chunks.end(), is_valid_utf8));
+        }
+    }
+}
+
+TEST_CASE("trailing_tone_without_an_earlier_tone_keeps_its_phoneme") {
+    const std::string input = repeat("ʂ", 509) + "→.";
+    const auto chunks = split_phonemes(input, kLimit);
+    CHECK(chunks == std::vector<std::string>{repeat("ʂ", 508), "ʂ→."});
+    CHECK(join(chunks) == input);
+    CHECK(std::all_of(chunks.begin(), chunks.end(), is_valid_utf8));
+}
+
+TEST_CASE("punctuation_boundary_precedes_splitting_an_oversized_group") {
+    const std::string first_sentence = std::string(100, 'a') + ".";
+    const std::string word(199, 'b');
+    const std::string input = first_sentence + " " + word + " " + word + " " + word + ". c.";
+    const auto chunks = split_phonemes(input, kLimit);
+    CHECK(chunks == std::vector<std::string>{first_sentence, word + " " + word, word + ". c."});
+    CHECK(strip_spaces(join(chunks)) == strip_spaces(input));
+    CHECK(all_bounded(chunks));
+}
+
+TEST_CASE("punctuation_boundary_precedes_hard_splitting_a_word") {
+    const std::string first_sentence = std::string(100, 'a') + ".";
+    const std::string syllable = repeat("ʂ", 398) + "→";
+    const std::string input = first_sentence + " " + repeat(syllable, 2) + ".";
+    const auto chunks = split_phonemes(input, kLimit);
+    CHECK(chunks == std::vector<std::string>{first_sentence, syllable, syllable + "."});
+    CHECK(strip_spaces(join(chunks)) == strip_spaces(input));
+    CHECK(all_bounded(chunks));
+}

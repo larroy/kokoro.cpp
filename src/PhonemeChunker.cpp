@@ -43,15 +43,14 @@ bool is_tone_mark(const std::string& word, std::size_t pos, std::size_t next) {
     return std::find(kToneMarks.begin(), kToneMarks.end(), character) != kToneMarks.end();
 }
 
-// Byte end of the piece of word starting at begin: the rest if it fits in max_length characters, else just past the
-// last tone mark within the window, else exactly max_length characters. A cut that would leave only the trailing
-// punctuation (which starts after last_core_start) moves back to last_core_start.
+// Prefer the last tone boundary within the window that leaves a phoneme with trailing punctuation. If there is no
+// such boundary, cut at the character limit, moving back to reserve the final phoneme (and its tone) when possible.
 std::size_t hard_cut(const std::string& word, std::size_t begin, std::size_t max_length, std::size_t last_core_start) {
     std::size_t end = begin;
     std::size_t after_tone = begin;
     for (std::size_t n = 0; n < max_length && end < word.size(); ++n) {
         const std::size_t next = utf8_next(word, end);
-        if (is_tone_mark(word, end, next)) after_tone = next;
+        if (next <= last_core_start && is_tone_mark(word, end, next)) after_tone = next;
         end = next;
     }
     if (end == word.size()) return end;
@@ -60,12 +59,16 @@ std::size_t hard_cut(const std::string& word, std::size_t begin, std::size_t max
     return end;
 }
 
-// Byte offset where the last non-punctuation character of word starts; npos if word is all punctuation.
+// Byte offset of the final non-punctuation character; a final tone mark also reserves its preceding phoneme.
 std::size_t last_core_char_start(const std::string& word) {
     const std::size_t core_end = word.find_last_not_of(kPunctuation);
     if (core_end == std::string::npos) return std::string::npos;
     std::size_t start = core_end;
     while (start > 0 && (static_cast<unsigned char>(word[start]) & 0xC0) == 0x80) --start;
+    if (start > 0 && is_tone_mark(word, start, core_end + 1)) {
+        --start;
+        while (start > 0 && (static_cast<unsigned char>(word[start]) & 0xC0) == 0x80) --start;
+    }
     return start;
 }
 
@@ -81,9 +84,8 @@ std::vector<std::string> hard_split(const std::string& word, std::size_t max_len
     return pieces;
 }
 
-// group if it fits; else its space-separated words (empty ones dropped), each word over the limit hard-split.
+// Split an oversized group into space-separated words (empty ones dropped), hard-splitting words over the limit.
 std::vector<std::string> pieces(const std::string& group, std::size_t max_length) {
-    if (utf8_length(group) <= max_length) return {group};
     std::vector<std::string> out;
     std::size_t begin = 0;
     while (begin <= group.size()) {
@@ -100,33 +102,39 @@ std::vector<std::string> pieces(const std::string& group, std::size_t max_length
     return out;
 }
 
-// Joins pieces with single spaces, starting a new chunk when the next piece would push it past max_length.
-std::vector<std::string> pack(const std::vector<std::string>& pieces, std::size_t max_length) {
-    std::vector<std::string> chunks;
-    std::string current;
-    std::size_t current_length = 0;
-    for (const std::string& piece : pieces) {
-        const std::size_t piece_length = utf8_length(piece);
-        if (!current.empty() && current_length + 1 + piece_length <= max_length) {
-            current += ' ' + piece;
-            current_length += 1 + piece_length;
-            continue;
-        }
-        if (!current.empty()) chunks.push_back(std::move(current));
-        current = piece;
+// Append to the current chunk if it fits, else open a new chunk. A zero current_length forces a group boundary.
+void append_piece(std::vector<std::string>& chunks, std::size_t& current_length, const std::string& piece,
+                  std::size_t piece_length, std::size_t max_length) {
+    if (current_length > 0 && current_length + 1 + piece_length <= max_length) {
+        chunks.back() += ' ';
+        chunks.back() += piece;
+        current_length += 1 + piece_length;
+    } else {
+        chunks.push_back(piece);
         current_length = piece_length;
     }
-    if (!current.empty()) chunks.push_back(std::move(current));
+}
+
+// Pack punctuation groups whole when they fit. Start an oversized group in a new chunk before splitting its words.
+std::vector<std::string> pack(const std::vector<std::string>& groups, std::size_t max_length) {
+    std::vector<std::string> chunks;
+    std::size_t current_length = 0;
+    for (const std::string& group : groups) {
+        const std::size_t group_length = utf8_length(group);
+        if (group_length <= max_length) {
+            append_piece(chunks, current_length, group, group_length, max_length);
+            continue;
+        }
+        current_length = 0;
+        for (const std::string& piece : pieces(group, max_length)) {
+            append_piece(chunks, current_length, piece, utf8_length(piece), max_length);
+        }
+    }
     return chunks;
 }
 
 }  // namespace
 
 std::vector<std::string> split_phonemes(const std::string& phonemes, std::size_t max_length) {
-    std::vector<std::string> all_pieces;
-    for (const std::string& group : attach_punctuation(segments(phonemes))) {
-        const std::vector<std::string> group_pieces = pieces(group, max_length);
-        all_pieces.insert(all_pieces.end(), group_pieces.begin(), group_pieces.end());
-    }
-    return pack(all_pieces, max_length);
+    return pack(attach_punctuation(segments(phonemes)), max_length);
 }
