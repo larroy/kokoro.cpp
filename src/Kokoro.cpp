@@ -193,15 +193,18 @@ std::pair<std::vector<float>, int> Kokoro::_create_audio(
     const std::vector<float>& voice,
     float speed
 ) {
-    std::string truncated_phonemes = phonemes;
-    if (phonemes.length() > MAX_PHONEME_LENGTH) {
-        truncated_phonemes = phonemes.substr(0, MAX_PHONEME_LENGTH);
-    }
-
-    std::vector<int> tokens_raw = encoder_->encode(truncated_phonemes);
+    std::vector<int> tokens_raw = encoder_->encode(phonemes);
     // Nothing to say: skip the model rather than run it on the padding tokens alone, as upstream
     // Kokoro skips empty phoneme strings (`if not ps: continue`).
     if (tokens_raw.empty()) return {{}, SAMPLE_RATE};
+
+    // split_phonemes keeps chunks within MAX_PHONEME_LENGTH characters, at most one token each: a last resort.
+    const auto max_tokens = static_cast<size_t>(MAX_PHONEME_LENGTH);
+    if (tokens_raw.size() > max_tokens) {
+        std::fprintf(stderr, "kokoro: chunk of %zu phoneme tokens exceeds %zu; dropping the excess\n",
+                     tokens_raw.size(), max_tokens);
+        tokens_raw.resize(max_tokens);
+    }
 
     // Add start and end tokens (0)
     std::vector<int64_t> tokens = {0};

@@ -58,6 +58,21 @@ size_t synth_length(const char* text, const char* voice, unsigned flags) {
     return n;
 }
 
+size_t code_points(const std::string& s) {
+    return static_cast<size_t>(
+        std::count_if(s.begin(), s.end(), [](char c) { return (static_cast<unsigned char>(c) & 0xC0) != 0x80; }));
+}
+
+std::string join(const std::vector<std::string>& parts, const std::string& separator) {
+    std::string out;
+    for (size_t i = 0; i < parts.size(); ++i) out += (i == 0 ? "" : separator) + parts[i];
+    return out;
+}
+
+double synth_seconds(const std::string& text, const char* voice) {
+    return static_cast<double>(synth_length(text.c_str(), voice, 0)) / 24000.0;
+}
+
 // Minimal reader/writer for the voices file format (docs/adding-voices.md).
 using VoiceTable = std::map<std::string, std::vector<float>>;
 constexpr size_t kStyleDim = 256;
@@ -279,6 +294,44 @@ TEST_CASE("style_row_follows_token_count") {
     CHECK(length("probe") == with_donor);
     CHECK(length("probe_short") == with_donor);
     kokoro_destroy(ctx);
+}
+
+// Unpunctuated text longer than one chunk used to lose everything past byte 510 of the stretch. Commas add pauses, so
+// the unpunctuated text is a bit shorter, but not by the truncated share.
+TEST_CASE("unpunctuated_long_text_is_not_truncated") {
+    struct Variant {
+        const char* voice;
+        std::vector<std::string> clauses;
+        std::string reference_separator;
+        std::vector<std::string> separators;
+    };
+    const std::vector<std::string> english = {
+        "the old lighthouse keeper climbed the narrow stairs every single evening",
+        "he polished the great brass lamp until it shone across the dark water",
+        "the fishing boats followed its steady beam back to the quiet harbor",
+        "his daughter wrote down the weather in a small leather notebook",
+        "the storms of that winter were the worst anyone could remember",
+        "but the light never once failed the sailors who trusted it",
+    };
+    std::vector<std::string> english_twice = english;
+    english_twice.insert(english_twice.end(), english.begin(), english.end());
+    const std::vector<Variant> variants = {
+        {"af_maple", english_twice, ", and ", {" and ", ": "}},
+        {kVoice, std::vector<std::string>(8, "我们明天早上一起去公园散步然后回家吃饭"), "，", {""}},
+    };
+
+    for (const Variant& v : variants) {
+        const double reference_s = synth_seconds(join(v.clauses, v.reference_separator), v.voice);
+        for (const std::string& sep : v.separators) {
+            const std::string text = join(v.clauses, sep);
+            CAPTURE(text);
+            REQUIRE(code_points(ph(text.c_str())) > 510);
+            const double plain_s = synth_seconds(text, v.voice);
+            MESSAGE(std::string(v.voice), " sep='", sep, "': ", plain_s, " s vs ", reference_s, " s punctuated");
+            CHECK(plain_s > 0.85 * reference_s);
+            CHECK(plain_s < 1.15 * reference_s);
+        }
+    }
 }
 
 TEST_CASE("cpu_device_is_honored") {

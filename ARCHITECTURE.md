@@ -81,10 +81,16 @@ flowchart TD
 3. **Phonemize.** Unless the input is already phonemes, `Phonemizer::phonemize(text, language)` dispatches to that
    language's `PhonemizerBase`. It passes along the number language set by `kokoro_set_number_language`. The result is
    one UTF-8 phoneme string in Kokoro's symbol set.
-4. **Chunk.** `split_phonemes` (`src/PhonemeChunker.cpp`) splits at `.,!?;`, trims the segments, and packs them into
-   chunks shorter than `MAX_PHONEME_LENGTH` = 510 **bytes**. A single over-long segment stays one chunk.
-5. **Encode.** `Kokoro::_create_audio` truncates the chunk to 510 bytes. Then `PhonemeEncoder::encode` maps each UTF-8
-   character to its id from `dict/vocab.txt` and **silently drops characters that are not in the vocab**.
+4. **Chunk.** `split_phonemes` (`src/PhonemeChunker.cpp`) splits at `.,!?;`, keeping each mark with the text before
+   it, trims the segments, and packs them into chunks of at most `MAX_PHONEME_LENGTH` = 510 UTF-8 characters, counted
+   as `PhonemeEncoder` splits them (so at most 510 tokens). Punctuation groups are packed whole; an oversized group
+   starts a new chunk before splitting at spaces, so an earlier punctuation boundary takes precedence. A space-free
+   word over the limit (unpunctuated Chinese) is cut after its last tone mark (`→ ↗ ↘ ↓`) within the limit, else at
+   exactly 510 characters. A cut that would strand trailing punctuation retreats to the preceding tone boundary, or
+   reserves the final phoneme and its tone if no earlier tone boundary exists. Nothing is dropped.
+5. **Encode.** `PhonemeEncoder::encode` maps each UTF-8 character to its id from `dict/vocab.txt` and **silently drops
+   characters that are not in the vocab**. More than 510 tokens (unreachable after chunking) are capped at 510 with a
+   `kokoro:` warning on stderr.
    - If the result is empty, no audio is returned and the model is not run. This mirrors upstream, which skips empty
      phoneme strings.
    - Otherwise token 0 is added at both ends.
@@ -325,7 +331,5 @@ The full contract is in [docs/thread-safety.md](docs/thread-safety.md).
 ## Known sharp edges
 
 - `trim_audio` (`src/Kokoro.cpp`) is a no-op, so `trim=true` changes nothing.
-- A single phoneme segment longer than 510 bytes is truncated to 510 bytes. The limit counts bytes, and the encoder
-  drops a UTF-8 character cut at the boundary.
 - Models with an `input_ids` input receive the speed as int32, so its fractional part is lost.
 - Phonemizer output symbols that are missing from `vocab.txt` vanish without a warning.

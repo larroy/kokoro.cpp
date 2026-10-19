@@ -17,7 +17,8 @@ class PhonemeEncoder;
 struct KoKoroConfig;
 
 // Constants from config
-const int MAX_PHONEME_LENGTH = 510; // Example value
+// MAX_PHONEME_LENGTH: phoneme tokens per model call; split_phonemes keeps chunks within this many UTF-8 characters.
+const int MAX_PHONEME_LENGTH = 510;
 const int SAMPLE_RATE = 24000;      // Example value
 const int STYLE_DIM = 256;          // floats per style row; a voice is a table of these rows
 

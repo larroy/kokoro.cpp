@@ -112,6 +112,7 @@ add_library(kokoro_core STATIC
     src/chinese_english/ZHFrontend.cpp
     src/NeuralG2P.cpp
     src/PhonemeText.cpp
+    src/Utf8.cpp
     src/german/GermanG2P.cpp
     src/german/GermanLexicon.cpp
     src/german/GermanPhonemizer.cpp
