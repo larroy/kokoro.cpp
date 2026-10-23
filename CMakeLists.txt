@@ -181,6 +181,38 @@ elseif (UNIX)
     set_target_properties(kokoro_cli PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 endif()
 
+add_library(kokoro_server_lib STATIC
+    src/server/speech_request.cpp
+    src/server/audio_encoding.cpp
+    src/server/speech_service.cpp
+    src/server/http_routes.cpp
+)
+target_include_directories(kokoro_server_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/server")
+target_include_directories(kokoro_server_lib SYSTEM PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cpp-httplib"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nlohmann_json/include"
+)
+target_link_libraries(kokoro_server_lib PUBLIC kokoro Threads::Threads)
+if (WIN32)
+    target_link_libraries(kokoro_server_lib PUBLIC ws2_32)
+endif()
+
+add_executable(kokoro_server src/server/main.cpp src/cli/console.cpp)
+target_include_directories(kokoro_server PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/cli")
+target_link_libraries(kokoro_server PRIVATE kokoro_server_lib)
+set_target_properties(kokoro_server PROPERTIES OUTPUT_NAME kokoro-server)
+if (WIN32)
+    target_link_libraries(kokoro_server PRIVATE Shell32)
+endif()
+if (MSVC)
+    set_target_properties(kokoro_server PROPERTIES PDB_NAME kokoro_server)
+elseif (APPLE)
+    set_target_properties(kokoro_server PROPERTIES INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+elseif (UNIX)
+    set_target_properties(kokoro_server PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()
+install(TARGETS kokoro_server RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 # Install: headers, libkokoro and a CMake package (find_package(kokoro) -> kokoro::kokoro).
 install(TARGETS kokoro EXPORT kokoroTargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

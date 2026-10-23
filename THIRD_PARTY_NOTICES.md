@@ -19,6 +19,20 @@ Each component remains under its own license; the full license texts are in the 
 - License: MIT
 - License text: `third_party/cppjieba/deps/limonp/LICENSE`
 
+## Compiled into kokoro-server
+
+### cpp-httplib
+
+- Source: https://github.com/yhirose/cpp-httplib (v0.63.0)
+- License: MIT
+- License text: `third_party/cpp-httplib/LICENSE`
+
+### nlohmann/json
+
+- Source: https://github.com/nlohmann/json (v3.12.0)
+- License: MIT
+- License text: `third_party/nlohmann_json/LICENSE.MIT`
+
 ## Redistributed data (`dict/`, shipped as `kokoro-dict/` in the Larroy.Kokoro NuGet package)
 
 ### CMU Pronouncing Dictionary

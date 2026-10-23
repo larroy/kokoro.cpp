@@ -65,7 +65,7 @@ At runtime the CUDA 12 and cuDNN 9 libraries must be loadable: on `PATH` on Wind
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-Tests live in `tests/` (doctest, vendored in `third_party/doctest`): `c_api` checks the C API without a model, `g2p` pins the Chinese/English G2P output, and `synthesis` runs the real model from `models/` (skipped if the model or voices file is missing). Configure with `-DKOKORO_BUILD_TESTS=OFF` to skip building them.
+Tests live in `tests/` (doctest, vendored in `third_party/doctest`): `c_api` checks the C API without a model, `g2p` pins the Chinese/English G2P output, `server` checks the HTTP server's request parsing and WAV/PCM encoding, and `synthesis` and `server_synthesis` run the real model from `models/` (skipped if the model or voices file is missing). Configure with `-DKOKORO_BUILD_TESTS=OFF` to skip building them.
 
 The Python tools have their own tests in `tests/python/`: run `uv run pytest`. The `.pt` import tests are skipped unless PyTorch is installed; `uv run --group voice pytest` runs them too.
 
@@ -134,6 +134,22 @@ German (voices `df_eva`, `df_victoria`, `dm_bernd`, `dm_martin`; `df_*`/`dm_*` v
 ```
 
 Output is a mono 32-bit float WAV at 24 kHz. Exit status is 0 on success, 1 on a library error, and 2 on a usage error.
+
+### HTTP server
+
+`kokoro-server` loads the model once and serves an OpenAI-compatible text-to-speech API. Run it from the project root (it takes the same `-m`, `--voices`, `-d`, `--lang`, `--language`, `--device` and `--gpu-id` options as `kokoro`):
+
+```bash
+./build/kokoro-server --host 127.0.0.1 --port 8880 -v af_maple
+curl -o hello.wav -H 'Content-Type: application/json' \
+    -d '{"model":"kokoro","input":"Hello world","voice":"af_maple"}' http://127.0.0.1:8880/v1/audio/speech
+```
+
+- `POST /v1/audio/speech`: `input` (required), `voice` (default: `-v`), `speed` (> 0, default 1.0) and `response_format` (`wav`, the default, or `pcm`). `wav` is a 16-bit PCM mono WAV at 24 kHz; `pcm` is the same samples raw, signed 16-bit little-endian. Other formats, unknown voices and invalid fields get HTTP 400 with an OpenAI-style JSON error. `model` and `instructions` are ignored.
+- `GET /v1/audio/voices`: `{"voices": [...]}` with the loaded voice names.
+- `GET /health`: `{"status":"ok"}`.
+
+Requests are synthesized one at a time on the shared model. The server has no authentication, so keep it on loopback. Exit status is 1 if the model cannot be loaded or the port is in use, and 2 on a usage error.
 
 ## Library
 
@@ -218,6 +234,7 @@ accent on the stressed vowel; sounds Spanish spelling lacks are written as IPA (
 
 - `include/kokoro/kokoro.h`, `src/kokoro_c.cpp`: public C API of `libkokoro`.
 - `src/cli/main.cpp`: the `kokoro` command-line tool.
+- `src/server/`: the `kokoro-server` OpenAI-compatible HTTP server.
 - `src/Kokoro.cpp/h`: main TTS class (internal).
 - `src/EnG2P.h`, `src/NeuralG2P.cpp/h`: English G2P (dictionary lookup and neural prediction).
 - `src/SpanishG2P.cpp/h`: rule-based Spanish G2P (espeak-ng `es` conventions).

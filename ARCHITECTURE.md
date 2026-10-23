@@ -27,6 +27,7 @@ flowchart LR
     scripts["scripts/"] -->|"vocab.txt, g2p_*.weights"| dict["dict/"]
     core["kokoro_core (static)"] --> lib["kokoro (shared, C API)"]
     lib --> cli["kokoro CLI"]
+    lib --> server["kokoro-server (HTTP)"]
     lib --> dotnet["Kokoro.Net (P/Invoke)"] --> nuget["NuGet packages"]
     core --> coretests["test_g2p / test_chunker / g2p_dump"]
     lib --> libtests["test_c_api / test_synthesis*"]
@@ -40,12 +41,13 @@ flowchart LR
 | `include/kokoro/` | public C header |
 | `src/` | engine, G2P, C API implementation |
 | `src/cli/` | CLI |
+| `src/server/` | HTTP server |
 | `src/chinese_english/`, `src/english/`, `src/spanish/`, `src/german/` | per-language G2P |
 | `dotnet/` | wrapper, example, tests |
 | `packaging/` | NuGet build scripts |
 | `dict/` | runtime G2P data |
 | `models/` | downloaded, not committed |
-| `third_party/` | onnxruntime, cppjieba, doctest, miniaudio |
+| `third_party/` | onnxruntime, cppjieba, doctest, miniaudio, cpp-httplib, nlohmann/json |
 | `eval_bench/` | G2P bench |
 | `tests/` | ctest and pytest suites |
 | `scripts/` | one-off converters |
@@ -215,6 +217,15 @@ These are the touch points the German addition went through, in order:
   - `AudioPlayer` (`src/cli/audio_player.cpp`) plays the clips through miniaudio, built for playback only. The device
     opens lazily at the first clip's sample rate, and clips are never freed on the audio thread.
   - Commands: `/voice`, `/speed`, `/voices`, `/help`, `/quit`.
+
+**HTTP server (`src/server/`).** `main.cpp` reuses the CLI's engine-option parsers (`src/cli/engine_options.h`) and
+serves an OpenAI-compatible API with cpp-httplib.
+- `SpeechService` owns the one context and serializes `kokoro_synthesize` behind a mutex; HTTP worker threads share it.
+- `POST /v1/audio/speech` (`http_routes.cpp`) parses the JSON body (`speech_request.cpp`), then encodes the float
+  samples as 16-bit PCM WAV or raw PCM (`audio_encoding.cpp`). Other formats get an OpenAI-style 400 error.
+- `GET /v1/audio/voices` lists the loaded voices; `GET /health` answers `{"status":"ok"}`.
+- The listen socket uses `SO_REUSEADDR` (`SO_EXCLUSIVEADDRUSE` on Windows) instead of httplib's default
+  `SO_REUSEPORT`, so a second server on the same port fails instead of sharing it.
 
 **.NET (`dotnet/`).**
 - `KokoroNative` calls the C API through `DllImport("kokoro")`, marshalling strings as `LPUTF8Str`. Strings owned by
