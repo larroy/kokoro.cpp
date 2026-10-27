@@ -25,15 +25,27 @@ target_link_libraries(test_synthesis PRIVATE kokoro kokoro_doctest)
 add_test(NAME synthesis COMMAND test_synthesis "${KOKORO_TEST_MODEL}" "${KOKORO_TEST_VOICES}" "${KOKORO_TEST_DICT_DIR}")
 set_tests_properties(synthesis PROPERTIES SKIP_RETURN_CODE 77)
 
-add_executable(test_server test_server.cpp)
-target_link_libraries(test_server PRIVATE kokoro_server_lib kokoro_doctest)
-add_test(NAME server COMMAND test_server)
-
-add_executable(test_server_synthesis test_server_synthesis.cpp)
-target_link_libraries(test_server_synthesis PRIVATE kokoro_server_lib kokoro_doctest)
-add_test(NAME server_synthesis COMMAND test_server_synthesis "${KOKORO_TEST_MODEL}" "${KOKORO_TEST_VOICES}"
-         "${KOKORO_TEST_DICT_DIR}")
-set_tests_properties(server_synthesis PROPERTIES SKIP_RETURN_CODE 77)
+# kokoro-server: unit tests and the end-to-end HTTP test (skipped without the model) run under cargo.
+if (KOKORO_BUILD_SERVER)
+    set(server_test_env ${KOKORO_CARGO_ENV}
+        "KOKORO_TEST_MODEL=${KOKORO_TEST_MODEL}"
+        "KOKORO_TEST_VOICES=${KOKORO_TEST_VOICES}"
+        "KOKORO_TEST_DICT_DIR=${KOKORO_TEST_DICT_DIR}")
+    if (WIN32)
+        # Windows has no rpath: put kokoro.dll and the ONNX Runtime DLLs next to cargo's test executables.
+        add_custom_target(server_test_dlls ALL
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/deps"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:kokoro> ${ONNXRUNTIME_RUNTIME_DLLS}
+                    "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/deps"
+            VERBATIM)
+        add_dependencies(server_test_dlls kokoro)
+    endif()
+    add_test(NAME server
+        COMMAND ${CMAKE_COMMAND} -E env ${server_test_env}
+                "${CARGO}" test --locked --profile ${KOKORO_CARGO_PROFILE}
+                --manifest-path "${PROJECT_SOURCE_DIR}/src/server/Cargo.toml")
+endif()
 
 add_executable(test_synthesis_es test_synthesis_es.cpp)
 target_link_libraries(test_synthesis_es PRIVATE kokoro kokoro_doctest)
@@ -57,8 +69,7 @@ add_test(NAME chunker COMMAND test_chunker)
 
 # Windows has no rpath: put kokoro.dll and the ONNX Runtime DLLs next to the test executables.
 if (WIN32)
-    foreach(test_target test_c_api test_synthesis test_synthesis_es test_synthesis_de test_server
-                        test_server_synthesis)
+    foreach(test_target test_c_api test_synthesis test_synthesis_es test_synthesis_de)
         add_custom_command(TARGET ${test_target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:kokoro> ${ONNXRUNTIME_RUNTIME_DLLS} $<TARGET_FILE_DIR:${test_target}>)
     endforeach()

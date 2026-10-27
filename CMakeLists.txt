@@ -181,37 +181,34 @@ elseif (UNIX)
     set_target_properties(kokoro_cli PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
 endif()
 
-add_library(kokoro_server_lib STATIC
-    src/server/speech_request.cpp
-    src/server/audio_encoding.cpp
-    src/server/speech_service.cpp
-    src/server/http_routes.cpp
-)
-target_include_directories(kokoro_server_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/server")
-target_include_directories(kokoro_server_lib SYSTEM PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/cpp-httplib"
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nlohmann_json/include"
-)
-target_link_libraries(kokoro_server_lib PUBLIC kokoro Threads::Threads)
-if (WIN32)
-    target_link_libraries(kokoro_server_lib PUBLIC ws2_32)
+# HTTP server: a Rust crate in src/server, built by cargo against libkokoro and copied next to it.
+option(KOKORO_BUILD_SERVER "Build kokoro-server (needs a Rust toolchain)" ON)
+if (KOKORO_BUILD_SERVER)
+    find_program(CARGO cargo HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin" "$ENV{USERPROFILE}/.cargo/bin")
+    if (NOT CARGO)
+        message(FATAL_ERROR
+            "cargo not found: install Rust (https://rustup.rs) or configure with -DKOKORO_BUILD_SERVER=OFF")
+    endif()
+    set(KOKORO_CARGO_TARGET_DIR "${CMAKE_BINARY_DIR}/cargo")
+    set(KOKORO_CARGO_PROFILE "$<IF:$<CONFIG:Debug>,dev,release>")
+    set(KOKORO_CARGO_ENV
+        "CARGO_TARGET_DIR=${KOKORO_CARGO_TARGET_DIR}"
+        "KOKORO_LIB_DIR=$<TARGET_LINKER_FILE_DIR:kokoro>"
+        "KOKORO_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}")
+    set(KOKORO_SERVER_EXE "kokoro-server${CMAKE_EXECUTABLE_SUFFIX}")
+    add_custom_target(kokoro_server ALL
+        COMMAND ${CMAKE_COMMAND} -E env ${KOKORO_CARGO_ENV}
+                "${CARGO}" build --locked --profile ${KOKORO_CARGO_PROFILE}
+                --manifest-path "${CMAKE_CURRENT_SOURCE_DIR}/src/server/Cargo.toml"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/${KOKORO_SERVER_EXE}"
+                "$<TARGET_FILE_DIR:kokoro>/${KOKORO_SERVER_EXE}"
+        COMMENT "Building kokoro-server with cargo"
+        VERBATIM
+    )
+    add_dependencies(kokoro_server kokoro)
+    install(PROGRAMS "$<TARGET_FILE_DIR:kokoro>/${KOKORO_SERVER_EXE}" DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-
-add_executable(kokoro_server src/server/main.cpp src/cli/console.cpp)
-target_include_directories(kokoro_server PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/cli")
-target_link_libraries(kokoro_server PRIVATE kokoro_server_lib)
-set_target_properties(kokoro_server PROPERTIES OUTPUT_NAME kokoro-server)
-if (WIN32)
-    target_link_libraries(kokoro_server PRIVATE Shell32)
-endif()
-if (MSVC)
-    set_target_properties(kokoro_server PROPERTIES PDB_NAME kokoro_server)
-elseif (APPLE)
-    set_target_properties(kokoro_server PROPERTIES INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
-elseif (UNIX)
-    set_target_properties(kokoro_server PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
-endif()
-install(TARGETS kokoro_server RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Install: headers, libkokoro and a CMake package (find_package(kokoro) -> kokoro::kokoro).
 install(TARGETS kokoro EXPORT kokoroTargets

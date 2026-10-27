@@ -21,17 +21,18 @@ Each component remains under its own license; the full license texts are in the 
 
 ## Compiled into kokoro-server
 
-### cpp-httplib
+kokoro-server statically links Rust crates from crates.io; the exact versions are pinned in `src/server/Cargo.lock`
+and each crate's license text ships in its source package (`cargo tree -e normal -f "{p} {l}"` lists them).
 
-- Source: https://github.com/yhirose/cpp-httplib (v0.63.0)
-- License: MIT
-- License text: `third_party/cpp-httplib/LICENSE`
-
-### nlohmann/json
-
-- Source: https://github.com/nlohmann/json (v3.12.0)
-- License: MIT
-- License text: `third_party/nlohmann_json/LICENSE.MIT`
+- MIT: axum, axum-core, bytes, http-body, http-body-util, hyper, hyper-util, mio, slab, tokio, tower, tower-layer,
+  tower-service, zmij
+- MIT OR Apache-2.0: atomic-waker, futures-core, futures-task, futures-util, http, httparse, httpdate, itoa, mime,
+  percent-encoding, pin-project-lite, serde_core, serde_json, smallvec, socket2, windows-link, windows-sys (Windows)
+- MIT AND BSD-3-Clause: matchit
+- Unlicense OR MIT: memchr
+- Apache-2.0: sync_wrapper
+- Build-time only (proc macros): proc-macro2, quote, syn (MIT OR Apache-2.0), tokio-macros (MIT), unicode-ident
+  ((MIT OR Apache-2.0) AND Unicode-3.0)
 
 ## Redistributed data (`dict/`, shipped as `kokoro-dict/` in the Larroy.Kokoro NuGet package)
 

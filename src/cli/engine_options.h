@@ -1,4 +1,4 @@
-// Value parsers for the engine options shared by the kokoro and kokoro-server front ends.
+// Value parsers for the engine options of the kokoro front end (kokoro-server ports them in src/server/options.rs).
 #ifndef KOKORO_CLI_ENGINE_OPTIONS_H
 #define KOKORO_CLI_ENGINE_OPTIONS_H
 
