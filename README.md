@@ -15,7 +15,7 @@ A high-performance, lightweight C++ inference implementation of the [Kokoro](htt
 - **CMake** (3.15+)
 - **Ninja** (recommended; `uv run bootstrap.py build` uses it when it is in `PATH`)
 - **C++ compiler** (C++17 support required)
-- **Rust** (1.80+, via [rustup](https://rustup.rs)): builds `kokoro-server`; configure with `-DKOKORO_BUILD_SERVER=OFF` to skip it
+- **Rust** (1.80+, via [rustup](https://rustup.rs)): builds `kokoro-server` for the CMake target (cross builds need `rustup target add <triple>`); configure with `-DKOKORO_BUILD_SERVER=OFF` to skip it
 - **[uv](https://docs.astral.sh/uv/)**: runs `bootstrap.py` and `voice_tool.py`, and installs their Python dependencies (Python 3.10+, click) into `.venv` on first use
 
 ## Setup
@@ -270,7 +270,7 @@ MIT
 - **CMake** (3.15+)
 - **Ninja**（推荐；`uv run bootstrap.py build` 在 `PATH` 中找到它时使用）
 - **C++ 编译器** (需要支持 C++17)
-- **Rust**（1.80+，通过 [rustup](https://rustup.rs) 安装）：用于构建 `kokoro-server`；配置时加 `-DKOKORO_BUILD_SERVER=OFF` 可跳过
+- **Rust**（1.80+，通过 [rustup](https://rustup.rs) 安装）：为 CMake 目标平台构建 `kokoro-server`（交叉编译需先运行 `rustup target add <triple>`）；配置时加 `-DKOKORO_BUILD_SERVER=OFF` 可跳过
 - **[uv](https://docs.astral.sh/uv/)**：用于运行 `bootstrap.py` 和 `voice_tool.py`，首次运行时会将其 Python 依赖（Python 3.10+、click）安装到 `.venv`
 
 ## 准备
@@ -496,7 +496,7 @@ Implementación ligera y de alto rendimiento en C++ de la inferencia del modelo 
 - **CMake** (3.15+)
 - **Ninja** (recomendado; `uv run bootstrap.py build` lo usa si está en el `PATH`)
 - **Compilador de C++** (con soporte de C++17)
-- **Rust** (1.80+, con [rustup](https://rustup.rs)): compila `kokoro-server`; configura con `-DKOKORO_BUILD_SERVER=OFF` para omitirlo
+- **Rust** (1.80+, con [rustup](https://rustup.rs)): compila `kokoro-server` para la plataforma destino de CMake (la compilación cruzada necesita `rustup target add <triple>`); configura con `-DKOKORO_BUILD_SERVER=OFF` para omitirlo
 - **[uv](https://docs.astral.sh/uv/)**: ejecuta `bootstrap.py` y `voice_tool.py`, e instala sus dependencias de Python (Python 3.10+, click) en `.venv` la primera vez
 
 ## Preparación
@@ -743,7 +743,7 @@ Eine schnelle, schlanke C++-Implementierung der Inferenz des TTS-Modells [Kokoro
 - **CMake** (3.15+)
 - **Ninja** (empfohlen; `uv run bootstrap.py build` verwendet es, wenn es im `PATH` liegt)
 - **C++-Compiler** (mit C++17-Unterstützung)
-- **Rust** (1.80+, über [rustup](https://rustup.rs)): baut `kokoro-server`; mit `-DKOKORO_BUILD_SERVER=OFF` konfigurieren, um es auszulassen
+- **Rust** (1.80+, über [rustup](https://rustup.rs)): baut `kokoro-server` für die CMake-Zielplattform (Cross-Builds brauchen `rustup target add <triple>`); mit `-DKOKORO_BUILD_SERVER=OFF` konfigurieren, um es auszulassen
 - **[uv](https://docs.astral.sh/uv/)**: führt `bootstrap.py` und `voice_tool.py` aus und installiert beim ersten Aufruf ihre Python-Abhängigkeiten (Python 3.10+, click) in `.venv`
 
 ## Einrichtung
