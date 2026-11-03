@@ -35,15 +35,15 @@ if (KOKORO_BUILD_SERVER)
         # Windows has no rpath: put kokoro.dll and the ONNX Runtime DLLs next to cargo's test executables.
         add_custom_target(server_test_dlls ALL
             COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/deps"
+                    "${KOKORO_CARGO_OUT_DIR}/deps"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:kokoro> ${ONNXRUNTIME_RUNTIME_DLLS}
-                    "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/deps"
+                    "${KOKORO_CARGO_OUT_DIR}/deps"
             VERBATIM)
         add_dependencies(server_test_dlls kokoro)
     endif()
     add_test(NAME server
         COMMAND ${CMAKE_COMMAND} -E env ${server_test_env}
-                "${CARGO}" test --locked --profile ${KOKORO_CARGO_PROFILE}
+                "${CARGO}" test --locked --profile ${KOKORO_CARGO_PROFILE} --target ${KOKORO_RUST_TRIPLE}
                 --manifest-path "${PROJECT_SOURCE_DIR}/src/server/Cargo.toml")
 endif()
 
