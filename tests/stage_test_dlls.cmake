@@ -5,9 +5,10 @@
 # with --message-format=json where they are, then copy the DLLs into the application directory of each one, which the
 # loader searches before System32.
 #
-# Parameters: CARGO (cargo executable), MANIFEST (Cargo.toml of the crate), PROFILE (cargo profile name), DLLS (the DLLs
-# to stage, '|'-separated because a test command line cannot carry a ';' list). The caller provides the build
-# environment (CARGO_TARGET_DIR, KOKORO_LIB_DIR, ...).
+# Parameters: CARGO (cargo executable), MANIFEST (Cargo.toml of the crate), PROFILE (cargo profile name), TARGET (the
+# Rust triple CMake builds for; empty for an explicit host build), DLLS (the DLLs to stage, '|'-separated because a test
+# command line cannot carry a ';' list). The caller provides the build environment (CARGO_TARGET_DIR, KOKORO_LIB_DIR,
+# ...).
 cmake_minimum_required(VERSION 3.15)
 
 foreach(var CARGO MANIFEST PROFILE DLLS)
@@ -16,9 +17,14 @@ foreach(var CARGO MANIFEST PROFILE DLLS)
     endif()
 endforeach()
 string(REPLACE "|" ";" dlls "${DLLS}")
+# Stage beside the same triple the `server` test runs, not the host binaries cargo builds without --target.
+set(target_args "")
+if (DEFINED TARGET AND NOT "${TARGET}" STREQUAL "")
+    set(target_args --target "${TARGET}")
+endif()
 
 execute_process(
-    COMMAND "${CARGO}" test --locked --profile "${PROFILE}" --no-run --message-format=json
+    COMMAND "${CARGO}" test --locked --profile "${PROFILE}" --no-run --message-format=json ${target_args}
             --manifest-path "${MANIFEST}"
     OUTPUT_VARIABLE cargo_json
     ERROR_VARIABLE cargo_log
