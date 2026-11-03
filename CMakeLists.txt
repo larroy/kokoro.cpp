@@ -187,27 +187,55 @@ if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
 else()
     set(KOKORO_IS_TOP_LEVEL OFF)
 endif()
-# HTTP server: a Rust crate in src/server, built by cargo against libkokoro and copied next to it.
-option(KOKORO_BUILD_SERVER "Build kokoro-server (needs a Rust toolchain)" ${KOKORO_IS_TOP_LEVEL})
+# HTTP server: a Rust crate in src/server, built by cargo for the CMake target's Rust triple and copied next to
+# libkokoro.
+include(cmake/KokoroRustTarget.cmake)
+set(KOKORO_RUST_TARGET "" CACHE STRING "Rust target triple for kokoro-server (empty: derived from the CMake target)")
+if (KOKORO_RUST_TARGET)
+    set(KOKORO_RUST_TRIPLE "${KOKORO_RUST_TARGET}")
+else()
+    kokoro_rust_target(KOKORO_RUST_TRIPLE)
+endif()
+if (KOKORO_IS_TOP_LEVEL AND KOKORO_RUST_TRIPLE)
+    set(kokoro_server_default ON)
+else()
+    set(kokoro_server_default OFF)
+endif()
+option(KOKORO_BUILD_SERVER "Build kokoro-server (needs a Rust toolchain)" ${kokoro_server_default})
 if (KOKORO_BUILD_SERVER)
+    if (NOT KOKORO_RUST_TRIPLE)
+        message(FATAL_ERROR "kokoro-server: no Rust target triple for ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}; "
+            "set -DKOKORO_RUST_TARGET=<triple> or configure with -DKOKORO_BUILD_SERVER=OFF")
+    endif()
     find_program(CARGO cargo HINTS "$ENV{CARGO_HOME}/bin" "$ENV{HOME}/.cargo/bin" "$ENV{USERPROFILE}/.cargo/bin")
     if (NOT CARGO)
         message(FATAL_ERROR
             "cargo not found: install Rust (https://rustup.rs) or configure with -DKOKORO_BUILD_SERVER=OFF")
     endif()
+    kokoro_require_rust_std("${CARGO}" "${KOKORO_RUST_TRIPLE}")
+    message(STATUS "kokoro-server Rust target: ${KOKORO_RUST_TRIPLE}")
     set(KOKORO_CARGO_TARGET_DIR "${CMAKE_BINARY_DIR}/cargo")
     set(KOKORO_CARGO_PROFILE "$<IF:$<CONFIG:Debug>,dev,release>")
+    # cargo --target puts artifacts in <target dir>/<triple>/<profile dir>.
+    set(KOKORO_CARGO_OUT_DIR "${KOKORO_CARGO_TARGET_DIR}/${KOKORO_RUST_TRIPLE}/$<IF:$<CONFIG:Debug>,debug,release>")
     set(KOKORO_CARGO_ENV
         "CARGO_TARGET_DIR=${KOKORO_CARGO_TARGET_DIR}"
         "KOKORO_LIB_DIR=$<TARGET_LINKER_FILE_DIR:kokoro>"
         "KOKORO_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}")
+    # Non-MSVC-ABI cross toolchains: link with the CMake C compiler unless the caller already chose a linker.
+    string(TOUPPER "${KOKORO_RUST_TRIPLE}" kokoro_triple_env)
+    string(REPLACE "-" "_" kokoro_triple_env "${kokoro_triple_env}")
+    if (CMAKE_CROSSCOMPILING AND NOT KOKORO_RUST_TRIPLE MATCHES "-msvc$"
+            AND NOT DEFINED ENV{CARGO_TARGET_${kokoro_triple_env}_LINKER})
+        list(APPEND KOKORO_CARGO_ENV "CARGO_TARGET_${kokoro_triple_env}_LINKER=${CMAKE_C_COMPILER}")
+    endif()
     set(KOKORO_SERVER_EXE "kokoro-server${CMAKE_EXECUTABLE_SUFFIX}")
     add_custom_target(kokoro_server ALL
         COMMAND ${CMAKE_COMMAND} -E env ${KOKORO_CARGO_ENV}
-                "${CARGO}" build --locked --profile ${KOKORO_CARGO_PROFILE}
+                "${CARGO}" build --locked --profile ${KOKORO_CARGO_PROFILE} --target ${KOKORO_RUST_TRIPLE}
                 --manifest-path "${CMAKE_CURRENT_SOURCE_DIR}/src/server/Cargo.toml"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/${KOKORO_SERVER_EXE}"
+                "${KOKORO_CARGO_OUT_DIR}/${KOKORO_SERVER_EXE}"
                 "$<TARGET_FILE_DIR:kokoro>/${KOKORO_SERVER_EXE}"
         COMMENT "Building kokoro-server with cargo"
         VERBATIM
