@@ -227,6 +227,9 @@ These are the touch points the German addition went through, in order:
 **HTTP server (`src/server/`).** A Rust crate (axum + tokio) that links `libkokoro` through hand-written C API
 declarations (`ffi.rs`) and serves an OpenAI-compatible API. CMake builds it with cargo (`KOKORO_BUILD_SERVER`) and
 copies `kokoro-server` next to `libkokoro`; `build.rs` links against the library and sets the rpath.
+`cmake/KokoroRustTarget.cmake` maps the CMake target (not the host) to a Rust triple that cargo builds with `--target`.
+`-DKOKORO_RUST_TARGET=<triple>` overrides it. Targets with no mapping (Android, iOS, macOS universal) default the
+server OFF, and a triple whose Rust standard library is missing fails at configure time.
 - `Engine` (`engine.rs`) owns the one context; `Audio` frees the samples with `kokoro_audio_free` on drop.
 - `AppState` (`routes.rs`) keeps the engine behind a `tokio::sync::Mutex`. A request waits for the lock without a
   thread, then synthesizes in `spawn_blocking`, which also reads the thread-local `kokoro_last_error()`.
