@@ -4,11 +4,14 @@ import android.content.Context
 import android.content.res.AssetManager
 import java.io.File
 import java.io.IOException
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 
 /** The G2P dictionaries bundled in this library's assets. */
 public object KokoroDict {
     private const val ASSET_DIR = "kokoro-dict"
     private const val STAMP = "kokoro-dict.stamp"
+    private const val LOCK = "kokoro-dict.lock"
 
     /**
      * Extracts the bundled dictionaries to `noBackupFilesDir/kokoro-dict` unless that copy is already current, and
@@ -24,15 +27,28 @@ public object KokoroDict {
         val expected = assets.open(STAMP).use { it.readBytes().decodeToString() }
         val root = context.noBackupFilesDir
         val target = File(root, ASSET_DIR)
-        if (File(target, STAMP).takeIf { it.isFile }?.readText() == expected) return target
+        if (isCurrent(target, expected)) return target
+        // Every process of the app stages into the same directory: serialize them across processes too.
+        val lockFile = File(root, LOCK)
+        FileChannel.open(lockFile.toPath(), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
+            channel.lock().use {
+                if (isCurrent(target, expected)) return target
+                replace(assets, root, target, expected)
+                return target
+            }
+        }
+    }
 
+    private fun isCurrent(target: File, expected: String): Boolean =
+        File(target, STAMP).takeIf { it.isFile }?.readText() == expected
+
+    private fun replace(assets: AssetManager, root: File, target: File, expected: String) {
         val staging = File(root, "$ASSET_DIR.tmp")
         staging.deleteRecursively()
         copyAssetTree(assets, ASSET_DIR, staging)
         File(staging, STAMP).writeText(expected)
         target.deleteRecursively()
         if (!staging.renameTo(target)) throw IOException("Could not move $staging to $target")
-        return target
     }
 
     // AssetManager.list returns no children for files; dict/ has no empty directories.
