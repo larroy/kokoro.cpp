@@ -21,6 +21,8 @@ cmake_install.cmake
 install_manifest.txt
 *.cmake
 !CMakeLists.txt
+# CMake scripts that belong to the repo, not to a build directory.
+!tests/*.cmake
 
 # Python
 __pycache__/
