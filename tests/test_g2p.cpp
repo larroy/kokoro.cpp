@@ -170,6 +170,35 @@ TEST_CASE("number_language_auto_and_forced") {
     }
 }
 
+TEST_CASE("percent_sign") {
+    struct PercentCase {
+        const char* input;
+        NumberLanguage language;
+        const char* expected;
+    };
+    static const PercentCase cases[] = {
+        {"35 %", NumberLanguage::English, "thirty five percent"},
+        {"35%", NumberLanguage::English, "thirty five percent"},
+        {"35\xEF\xBC\x85", NumberLanguage::English, "thirty five percent"},
+        {"3.5%", NumberLanguage::English, "three point five percent"},
+        {"It rose 35 % last year.", NumberLanguage::English, "It rose thirty five percent last year."},
+        {"35% off", NumberLanguage::English, "thirty five percent off"},
+        {"35%off", NumberLanguage::English, "thirty five percent off"},
+        {"35 apples", NumberLanguage::English, "thirty five apples"},
+        {"35%", NumberLanguage::Spanish, "treinta y cinco por ciento"},
+        {"35 %", NumberLanguage::German, "fünfunddreißig prozent"},
+        {"35%", NumberLanguage::Chinese, "百分之三十五"},
+        {"35\xEF\xBC\x85", NumberLanguage::Chinese, "百分之三十五"},
+        {"用了35%的电", NumberLanguage::Auto, "用了百分之三十五的电"},
+        {"I have 35%.", NumberLanguage::Auto, "I have thirty five percent."},
+    };
+    for (const PercentCase& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(normalize_numbers(input, c.language) == std::string(c.expected));
+    }
+}
+
 TEST_CASE("spanish_g2p") {
     // Pinned after eval_bench/compare_g2p.py matched espeak-ng on eval_bench/corpus/es.txt.
     static const Case cases[] = {

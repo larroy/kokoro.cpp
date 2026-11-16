@@ -5,6 +5,7 @@
 enum class NumberLanguage { Auto, English, Chinese, Spanish, German };
 
 // Replaces every number ([-+]?\d+(?:\.\d+)*) in UTF-8 `text` with words in `language`.
+// A percent sign after the number is read too: "35 %" -> "thirty five percent", "百分之三十五".
 // Auto: language of the nearest ASCII letter or CJK character before the number; if none, of the
 // first such character in the text; if none, Chinese.
 std::string normalize_numbers(const std::string& text, NumberLanguage language);

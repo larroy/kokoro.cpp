@@ -183,6 +183,8 @@ language.
 - Auto never resolves to Spanish or German. The Spanish and German phonemizers map Auto to their own language, and
   `EnglishPhonemizer` maps it to English.
 - An explicit number language applies in every phonemizer.
+- A percent sign after the number (with or without a space, ASCII `%` or full-width `％`) becomes words: `percent`,
+  `por ciento`, `prozent` (lowercase, as the German lexicon is), or the Chinese prefix `百分之`.
 
 **Shared helpers.**
 - `NeuralG2P` (`src/NeuralG2P.*`) is one GRU seq2seq engine. Each caller passes its own `G2PSymbols`, whose index
