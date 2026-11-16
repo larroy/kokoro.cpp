@@ -32,19 +32,28 @@ if (KOKORO_BUILD_SERVER)
         "KOKORO_TEST_VOICES=${KOKORO_TEST_VOICES}"
         "KOKORO_TEST_DICT_DIR=${KOKORO_TEST_DICT_DIR}")
     if (WIN32)
-        # Windows has no rpath: put kokoro.dll and the ONNX Runtime DLLs next to cargo's test executables.
-        add_custom_target(server_test_dlls ALL
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/deps"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:kokoro> ${ONNXRUNTIME_RUNTIME_DLLS}
-                    "${KOKORO_CARGO_TARGET_DIR}/$<IF:$<CONFIG:Debug>,debug,release>/deps"
-            VERBATIM)
-        add_dependencies(server_test_dlls kokoro)
+        # Windows has no rpath: stage kokoro.dll and the ONNX Runtime DLLs next to cargo's test executables. That
+        # directory moves with the cargo version (deps/ up to rustc 1.99, build/<crate>/<hash>/out after it), so ask
+        # cargo where the executables are instead of guessing. ';' cannot carry the list through a test command line,
+        # so '|' joins it and the script splits it again.
+        string(REPLACE ";" "|" server_dlls_arg "$<TARGET_FILE:kokoro>;${ONNXRUNTIME_RUNTIME_DLLS}")
+        add_test(NAME server_stage_dlls
+            COMMAND ${CMAKE_COMMAND} -E env ${server_test_env}
+                    ${CMAKE_COMMAND}
+                    "-DCARGO=${CARGO}"
+                    "-DMANIFEST=${PROJECT_SOURCE_DIR}/src/server/Cargo.toml"
+                    "-DPROFILE=${KOKORO_CARGO_PROFILE}"
+                    "-DDLLS=${server_dlls_arg}"
+                    -P "${CMAKE_CURRENT_LIST_DIR}/stage_test_dlls.cmake")
+        set_tests_properties(server_stage_dlls PROPERTIES FIXTURES_SETUP server_dlls)
     endif()
     add_test(NAME server
         COMMAND ${CMAKE_COMMAND} -E env ${server_test_env}
                 "${CARGO}" test --locked --profile ${KOKORO_CARGO_PROFILE}
                 --manifest-path "${PROJECT_SOURCE_DIR}/src/server/Cargo.toml")
+    if (WIN32)
+        set_tests_properties(server PROPERTIES FIXTURES_REQUIRED server_dlls)
+    endif()
 endif()
 
 add_executable(test_synthesis_es test_synthesis_es.cpp)
