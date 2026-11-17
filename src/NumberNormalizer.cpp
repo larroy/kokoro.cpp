@@ -302,9 +302,20 @@ SpokenNumber spoken_number(const std::string& match, NumberLanguage language, un
     return {BasicStringUtil::NumberToChinese(match), false, NumberLanguage::Chinese};
 }
 
+// German reads a final 1 as "eins" on its own but as "ein" when a noun follows: "einprozentig", "ein Prozent".
+std::string german_before_noun(std::string words) {
+    static const std::string kEins = "eins";
+    if (words.size() < kEins.size() || words.compare(words.size() - kEins.size(), kEins.size(), kEins) != 0) {
+        return words;
+    }
+    words.replace(words.size() - kEins.size(), kEins.size(), "ein");
+    return words;
+}
+
 // Appends or prepends the words for a percent sign: "35%" -> "thirty five percent", "百分之三十五".
 std::string with_percent(std::string words, NumberLanguage language) {
     const auto [percent, prefix] = percent_words(language);
+    if (language == NumberLanguage::German) words = german_before_noun(std::move(words));
     return prefix ? percent + words : words + percent;
 }
 
