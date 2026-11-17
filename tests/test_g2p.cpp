@@ -203,6 +203,106 @@ TEST_CASE("percent_sign") {
     }
 }
 
+TEST_CASE("clock_time") {
+    struct TimeCase {
+        const char* input;
+        NumberLanguage language;
+        const char* expected;
+    };
+    static const TimeCase cases[] = {
+        {"10:49 AM", NumberLanguage::English, "ten forty nine ay em"},
+        {"10:49am", NumberLanguage::English, "ten forty nine ay em"},
+        {"10:49 a.m.", NumberLanguage::English, "ten forty nine ay em."},
+        {"7:05 PM", NumberLanguage::English, "seven oh five pee em"},
+        {"10:00 AM", NumberLanguage::English, "ten ay em"},
+        {"10:00", NumberLanguage::English, "ten o'clock"},
+        {"12:30", NumberLanguage::English, "twelve thirty"},
+        {"19:29", NumberLanguage::English, "nineteen hours twenty nine minutes"},
+        {"19:00", NumberLanguage::English, "nineteen hours"},
+        {"19:01", NumberLanguage::English, "nineteen hours one minute"},
+        {"07:30", NumberLanguage::English, "seven hours thirty minutes"},
+        {"0:30", NumberLanguage::English, "zero hours thirty minutes"},
+        {"10:49:30", NumberLanguage::English, "ten hours forty nine minutes thirty seconds"},
+        {"10:49:01 PM", NumberLanguage::English, "ten hours forty nine minutes one second pee em"},
+        {"10:30:5", NumberLanguage::English, "ten:thirty:five"},
+        {"10\xEF\xBC\x9A" "30\xEF\xBC\x9A" "5", NumberLanguage::English, "ten\xEF\xBC\x9A" "thirty\xEF\xBC\x9A" "five"},
+        {"25:10:05", NumberLanguage::English, "twenty five:ten:five"},
+        {"Time:10:05", NumberLanguage::English, "Time:ten oh five"},
+        {"会议在5 AM, 6", NumberLanguage::Auto, "会议在上午五点, six"},
+        {"会议在5点, 6", NumberLanguage::Auto, "会议在五点, 六"},
+        {"19:29 PM", NumberLanguage::English, "nineteen hours twenty nine minutes PM"},
+        {"9:00-10:30", NumberLanguage::English, "nine o'clock-ten thirty"},
+        {"3:16", NumberLanguage::English, "three sixteen"},
+        {"25:30", NumberLanguage::English, "twenty five:thirty"},
+        {"10:5", NumberLanguage::English, "ten:five"},
+        {"10:30 amazing", NumberLanguage::English, "ten thirty amazing"},
+        {"5 AM", NumberLanguage::English, "five ay em"},
+        {"5pm", NumberLanguage::English, "five pee em"},
+        {"5 a.m.", NumberLanguage::English, "five ay em."},
+        {"12 am", NumberLanguage::English, "twelve ay em"},
+        {"05 PM", NumberLanguage::English, "five pee em"},
+        {"15 AM", NumberLanguage::English, "fifteen AM"},
+        {"5 amber", NumberLanguage::English, "five amber"},
+        {"5 a. m.", NumberLanguage::Spanish, "cinco en punto a eme."},
+        {"5 PM", NumberLanguage::German, "siebzehn uhr"},
+        {"5 AM", NumberLanguage::Chinese, "上午五点"},
+        {"10:49", NumberLanguage::Spanish, "diez y cuarenta y nueve"},
+        {"19:29", NumberLanguage::Spanish, "diecinueve y veintinueve"},
+        {"1:05", NumberLanguage::Spanish, "una y cinco"},
+        {"21:21", NumberLanguage::Spanish, "veintiuna y veintiuno"},
+        {"19:00", NumberLanguage::Spanish, "diecinueve horas"},
+        {"1:00", NumberLanguage::Spanish, "una en punto"},
+        {"01:00", NumberLanguage::Spanish, "una hora"},
+        {"10:49 a. m.", NumberLanguage::Spanish, "diez y cuarenta y nueve a eme."},
+        {"7:30 p.m.", NumberLanguage::Spanish, "siete y treinta pe eme."},
+        {"10:49:30", NumberLanguage::Spanish, "diez y cuarenta y nueve con treinta segundos"},
+        {"10:49:21", NumberLanguage::Spanish, "diez y cuarenta y nueve con veintiún segundos"},
+        {"10:49:01", NumberLanguage::Spanish, "diez y cuarenta y nueve con un segundo"},
+        {"10:49", NumberLanguage::German, "zehn uhr neunundvierzig"},
+        {"19:00", NumberLanguage::German, "neunzehn uhr"},
+        {"1:00", NumberLanguage::German, "ein uhr"},
+        {"10:01", NumberLanguage::German, "zehn uhr eins"},
+        {"0:30", NumberLanguage::German, "null uhr dreißig"},
+        {"19:29 Uhr", NumberLanguage::German, "neunzehn uhr neunundzwanzig"},
+        {"Um 19:00 Uhr.", NumberLanguage::German, "Um neunzehn uhr."},
+        {"10:49 PM", NumberLanguage::German, "zweiundzwanzig uhr neunundvierzig"},
+        {"12:15 AM", NumberLanguage::German, "null uhr fünfzehn"},
+        {"12:15 PM", NumberLanguage::German, "zwölf uhr fünfzehn"},
+        {"10:49:30", NumberLanguage::German, "zehn uhr neunundvierzig und dreißig sekunden"},
+        {"10:49:01", NumberLanguage::German, "zehn uhr neunundvierzig und eine sekunde"},
+        {"10:49", NumberLanguage::Chinese, "十点四十九分"},
+        {"19:00", NumberLanguage::Chinese, "十九点"},
+        {"2:00", NumberLanguage::Chinese, "两点"},
+        {"10:05", NumberLanguage::Chinese, "十点零五分"},
+        {"12:30", NumberLanguage::Chinese, "十二点三十分"},
+        {"0:30", NumberLanguage::Chinese, "零点三十分"},
+        {"10:49 AM", NumberLanguage::Chinese, "上午十点四十九分"},
+        {"10:49 PM", NumberLanguage::Chinese, "下午十点四十九分"},
+        {"10:49:30", NumberLanguage::Chinese, "十点四十九分三十秒"},
+        {"10:00:30", NumberLanguage::Chinese, "十点零分三十秒"},
+        {"10\xEF\xBC\x9A" "49", NumberLanguage::Chinese, "十点四十九分"},  // full-width colon
+        {"会议在10:30开始", NumberLanguage::Auto, "会议在十点三十分开始"},
+        {"The meeting is at 19:00.", NumberLanguage::Auto, "The meeting is at nineteen hours."},
+        {"Meet at 10:49 AM.", NumberLanguage::Auto, "Meet at ten forty nine ay em."},
+    };
+    for (const TimeCase& c : cases) {
+        const std::string input = c.input;
+        CAPTURE(input);
+        CHECK(normalize_numbers(input, c.language) == std::string(c.expected));
+    }
+}
+
+TEST_CASE("clock_time_phonemes") {
+    // AM is spelled out (/ˈA ˈɛm/), never read as the word "am".
+    const std::string am = g_en->phonemize("10:49 AM", NumberLanguage::Auto);
+    CHECK(am == g_en->phonemize("ten forty nine ay em", NumberLanguage::Auto));
+    CHECK(am.find("ˈA ˈɛm") != std::string::npos);
+    CHECK(g_en->phonemize("It is 5 AM now", NumberLanguage::Auto) ==
+          g_en->phonemize("It is five ay em now", NumberLanguage::Auto));
+    CHECK(german_to_phonemes("Um 19:00 Uhr.", NumberLanguage::Auto, *g_de) ==
+          german_to_phonemes("Um neunzehn Uhr.", NumberLanguage::Auto, *g_de));
+}
+
 TEST_CASE("spanish_g2p") {
     // Pinned after eval_bench/compare_g2p.py matched espeak-ng on eval_bench/corpus/es.txt.
     static const Case cases[] = {

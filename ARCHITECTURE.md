@@ -185,6 +185,17 @@ language.
 - An explicit number language applies in every phonemizer.
 - A percent sign after the number (with or without a space, ASCII `%` or full-width `％`) becomes words: `percent`,
   `por ciento`, `prozent` (lowercase, as the German lexicon is), or the Chinese prefix `百分之`.
+- A clock time `H:MM[:SS]` (hour 0–23, ASCII `:` or full-width `：`) is read as a time by `speak_time`
+  (`src/ClockTime.cpp`). A following AM/PM (`AM`, `a.m.`, `a. m.`; hours 1–12 only) is consumed, and so is a German
+  `Uhr`.
+  - English: `10:49 AM` → `ten forty nine ay em` (AM/PM spelled out), `10:05` → `ten oh five`, `10:00` →
+    `ten o'clock`. Hour 0, hours 13–23, a padded hour (`07:30`) or seconds give the explicit form: `19:29` →
+    `nineteen hours twenty nine minutes`.
+  - Spanish: `19:29` → `diecinueve y veintinueve`, `1:00` → `una en punto`, `19:00` → `diecinueve horas`.
+  - German: `19:29` → `neunzehn uhr neunundzwanzig`. AM/PM is converted to the 24-hour clock.
+  - Chinese: `10:49 AM` → `上午十点四十九分`, `2:00` → `两点`.
+- An hour written on its own before AM/PM (`5 PM`, `5pm`, `5 a.m.`; hours 1–12 only) is a time too: `five ay em`.
+  Any other number keeps the plain-number reading (`5 amber`, `15 AM`).
 
 **Shared helpers.**
 - `NeuralG2P` (`src/NeuralG2P.*`) is one GRU seq2seq engine. Each caller passes its own `G2PSymbols`, whose index
@@ -200,8 +211,8 @@ These are the touch points the German addition went through, in order:
 2. Implement `PhonemizerBase` under `src/<language>/` and add its sources to `kokoro_core` in `CMakeLists.txt`.
 3. Register it in `Phonemizer::Phonemizer`, adding new file-name keys to `PhonemizerConfig`.
 4. Add a voice-prefix `case` to `Kokoro::language_for`.
-5. If numbers need it, add a `NumberLanguage` member and word tables, wired into `spoken_number` in
-   `src/NumberNormalizer.cpp`.
+5. If numbers need it, add a `NumberLanguage` member and word tables, wired into `number_words` in
+   `src/NumberNormalizer.cpp`, and a clock-time reading in `speak_time` (`src/ClockTime.cpp`).
 6. Add `KOKORO_LANGUAGE_*` and `KOKORO_NUMBERS_*` values to `include/kokoro/kokoro.h`, with their `switch` cases in
    `src/kokoro_c.cpp`.
 7. Extend the CLI's `parse_language`, `parse_number_language` and usage text in `src/cli/main.cpp`.

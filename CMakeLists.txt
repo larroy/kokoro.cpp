@@ -107,6 +107,7 @@ add_library(kokoro_core STATIC
     src/spanish/SpanishPhonemizer.cpp
     src/chinese_english/ZHG2P.cpp
     src/NumberNormalizer.cpp
+    src/ClockTime.cpp
     src/chinese_english/PinyinFinder.cpp
     src/chinese_english/ToneSandhi.cpp
     src/chinese_english/ZHFrontend.cpp
