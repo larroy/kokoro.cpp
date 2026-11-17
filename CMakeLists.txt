@@ -192,6 +192,8 @@ endif()
 # libkokoro.
 include(cmake/KokoroRustTarget.cmake)
 set(KOKORO_RUST_TARGET "" CACHE STRING "Rust target triple for kokoro-server (empty: derived from the CMake target)")
+set(KOKORO_RUST_LINKER "" CACHE STRING
+    "Linker for kokoro-server cross builds (empty: the configured C compiler, for non-MSVC cross toolchains)")
 if (KOKORO_RUST_TARGET)
     set(KOKORO_RUST_TRIPLE "${KOKORO_RUST_TARGET}")
 else()
@@ -213,8 +215,9 @@ if (KOKORO_BUILD_SERVER)
         message(FATAL_ERROR
             "cargo not found: install Rust (https://rustup.rs) or configure with -DKOKORO_BUILD_SERVER=OFF")
     endif()
-    kokoro_require_rust_std("${CARGO}" "${KOKORO_RUST_TRIPLE}")
+    kokoro_rustc(KOKORO_RUSTC_COMPILER "${CARGO}" kokoro_rustc_export)
     message(STATUS "kokoro-server Rust target: ${KOKORO_RUST_TRIPLE}")
+    kokoro_require_rust_std("${KOKORO_RUSTC_COMPILER}" "${KOKORO_RUST_TRIPLE}")
     set(KOKORO_CARGO_TARGET_DIR "${CMAKE_BINARY_DIR}/cargo")
     set(KOKORO_CARGO_PROFILE "$<IF:$<CONFIG:Debug>,dev,release>")
     # cargo --target puts artifacts in <target dir>/<triple>/<profile dir>.
@@ -223,12 +226,22 @@ if (KOKORO_BUILD_SERVER)
         "CARGO_TARGET_DIR=${KOKORO_CARGO_TARGET_DIR}"
         "KOKORO_LIB_DIR=$<TARGET_LINKER_FILE_DIR:kokoro>"
         "KOKORO_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}")
-    # Non-MSVC-ABI cross toolchains: link with the CMake C compiler unless the caller already chose a linker.
+    if (kokoro_rustc_export)
+        # No rustc on PATH: hand Cargo the one beside it so the probe and the build use the same compiler.
+        list(APPEND KOKORO_CARGO_ENV "RUSTC=${KOKORO_RUSTC_COMPILER}")
+    endif()
+    # Non-MSVC-ABI cross toolchains: link with the CMake C compiler unless the caller already chose a linker. rustc
+    # passes no --target to a cc driver, so the linker must already default to the Rust triple: pass a prefixed cross
+    # compiler or a wrapper through KOKORO_RUST_LINKER when the compiler takes its target from CMAKE_C_COMPILER_TARGET.
     string(TOUPPER "${KOKORO_RUST_TRIPLE}" kokoro_triple_env)
     string(REPLACE "-" "_" kokoro_triple_env "${kokoro_triple_env}")
     if (CMAKE_CROSSCOMPILING AND NOT KOKORO_RUST_TRIPLE MATCHES "-msvc$"
             AND NOT DEFINED ENV{CARGO_TARGET_${kokoro_triple_env}_LINKER})
-        list(APPEND KOKORO_CARGO_ENV "CARGO_TARGET_${kokoro_triple_env}_LINKER=${CMAKE_C_COMPILER}")
+        if (KOKORO_RUST_LINKER)
+            list(APPEND KOKORO_CARGO_ENV "CARGO_TARGET_${kokoro_triple_env}_LINKER=${KOKORO_RUST_LINKER}")
+        else()
+            list(APPEND KOKORO_CARGO_ENV "CARGO_TARGET_${kokoro_triple_env}_LINKER=${CMAKE_C_COMPILER}")
+        endif()
     endif()
     set(KOKORO_SERVER_EXE "kokoro-server${CMAKE_EXECUTABLE_SUFFIX}")
     add_custom_target(kokoro_server ALL

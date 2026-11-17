@@ -32,6 +32,24 @@ function(_kokoro_rust_arch out_var)
     set(${out_var} "${arch}" PARENT_SCOPE)
 endfunction()
 
+# C library of the Linux target, from the toolchain's own triple: musl, else gnu.
+function(_kokoro_linux_libc out_var)
+    set(triple "${CMAKE_C_COMPILER_TARGET}")
+    if (NOT triple AND CMAKE_C_COMPILER AND NOT MSVC)
+        execute_process(COMMAND "${CMAKE_C_COMPILER}" -dumpmachine
+            OUTPUT_VARIABLE triple OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE status ERROR_QUIET)
+        if (NOT status EQUAL 0)
+            set(triple "")
+        endif()
+    endif()
+    if (triple MATCHES "musl")
+        set(libc musl)
+    else()
+        set(libc gnu)   # glibc, or a toolchain triple that does not say
+    endif()
+    set(${out_var} "${libc}" PARENT_SCOPE)
+endfunction()
+
 # Rust vendor-os(-env) suffix for the target, or "" when unsupported (Android, iOS, BSDs, ...).
 function(_kokoro_rust_os out_var)
     _kokoro_msvc_abi(msvc_abi)
@@ -42,7 +60,8 @@ function(_kokoro_rust_os out_var)
     elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         set(os apple-darwin)
     elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(os unknown-linux-gnu)
+        _kokoro_linux_libc(libc)
+        set(os "unknown-linux-${libc}")
     else()
         set(os "")
     endif()
@@ -60,11 +79,35 @@ function(kokoro_rust_target out_var)
     endif()
 endfunction()
 
-# Fails configuration unless the rustc next to cargo has the standard library for the triple.
-function(kokoro_require_rust_std cargo triple)
-    get_filename_component(cargo_dir "${cargo}" DIRECTORY)
-    find_program(KOKORO_RUSTC rustc HINTS "${cargo_dir}")
-    execute_process(COMMAND "${KOKORO_RUSTC}" --print target-libdir --target "${triple}"
+# Sets out_var to the rustc Cargo will use: an explicit RUSTC, else the rustc on PATH, else the one beside cargo
+# (exported to Cargo through out_export, since Cargo would not find that one). A build.rustc in .cargo/config.toml is
+# not visible here, so the probe can only be stricter than the build.
+function(kokoro_rustc out_var cargo out_export)
+    if (DEFINED ENV{RUSTC} AND NOT "$ENV{RUSTC}" STREQUAL "")
+        set(rustc "$ENV{RUSTC}")
+        set(export FALSE)
+    else()
+        find_program(_kokoro_path_rustc rustc)
+        if (_kokoro_path_rustc)
+            set(rustc "${_kokoro_path_rustc}")
+            set(export FALSE)
+        else()
+            get_filename_component(cargo_dir "${cargo}" DIRECTORY)
+            find_program(_kokoro_beside_rustc rustc HINTS "${cargo_dir}")
+            if (NOT _kokoro_beside_rustc)
+                message(FATAL_ERROR "rustc not found: ${cargo} is present but no rustc is on PATH or beside it")
+            endif()
+            set(rustc "${_kokoro_beside_rustc}")
+            set(export TRUE)
+        endif()
+    endif()
+    set(${out_var} "${rustc}" PARENT_SCOPE)
+    set(${out_export} "${export}" PARENT_SCOPE)
+endfunction()
+
+# Fails configuration unless rustc has the standard library for the triple.
+function(kokoro_require_rust_std rustc triple)
+    execute_process(COMMAND "${rustc}" --print target-libdir --target "${triple}"
         OUTPUT_VARIABLE libdir OUTPUT_STRIP_TRAILING_WHITESPACE
         RESULT_VARIABLE status ERROR_QUIET)
     if (NOT status EQUAL 0 OR NOT IS_DIRECTORY "${libdir}")
