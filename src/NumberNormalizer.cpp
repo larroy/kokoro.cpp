@@ -1,7 +1,10 @@
 #include "NumberNormalizer.h"
 
+#include "ClockTime.h"
 #include "Utils.h"
 
+#include <algorithm>
+#include <cctype>
 #include <regex>
 #include <utility>
 
@@ -242,10 +245,12 @@ const NumberWords g_english_words{"minus ", " point ", " dot ", g_digit_words, i
 const NumberWords g_spanish_words{"menos ", " punto ", " punto ", g_es_below_thirty, integer_to_spanish};
 const NumberWords g_german_words{"minus ", " komma ", " punkt ", g_de_below_twenty, integer_to_german};
 
+bool is_ascii_letter(unsigned char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'); }
+
+bool is_ascii_alnum(unsigned char c) { return is_ascii_letter(c) || (c >= '0' && c <= '9'); }
+
 bool pad_before(const std::string& result) {
-    if (result.empty()) return false;
-    const unsigned char last = result.back();
-    return (last >= 'A' && last <= 'Z') || (last >= 'a' && last <= 'z') || (last >= '0' && last <= '9');
+    return !result.empty() && is_ascii_alnum(static_cast<unsigned char>(result.back()));
 }
 
 // Position after any spaces at `pos` (space, tab, no-break space).
@@ -270,6 +275,39 @@ size_t percent_sign_end(const std::string& text, size_t pos) {
     return 0;
 }
 
+// Position after the dot of "a.m."/"a. m." at `pos` (the dot and one space), or `pos` if there is no dot.
+size_t skip_meridiem_dot(const std::string& text, size_t pos) {
+    if (pos >= text.size() || text[pos] != '.') return pos;
+    return pos + 1 < text.size() && text[pos + 1] == ' ' ? pos + 2 : pos + 1;
+}
+
+// AM/PM right after a time at `pos`, spaces included ("10:49 AM", "10:49am", "a.m.", "a. m."), and where it ends.
+// The final dot of "a.m." stays in the text so a sentence can still end there. {None, pos} if none.
+std::pair<Meridiem, size_t> meridiem_suffix(const std::string& text, size_t pos) {
+    const size_t start = skip_spaces(text, pos);
+    if (start >= text.size()) return {Meridiem::None, pos};
+    const int letter = std::tolower(static_cast<unsigned char>(text[start]));
+    const size_t m = skip_meridiem_dot(text, start + 1);
+    const bool has_m = (letter == 'a' || letter == 'p') && m < text.size() && (text[m] == 'm' || text[m] == 'M');
+    if (!has_m || (m + 1 < text.size() && is_ascii_letter(static_cast<unsigned char>(text[m + 1])))) {
+        return {Meridiem::None, pos};
+    }
+    return {letter == 'a' ? Meridiem::Am : Meridiem::Pm, m + 1};
+}
+
+// End of a German "Uhr" right after a time at `pos`, spaces included ("19:00 Uhr"); `pos` if none. "Uhrzeit" is not.
+size_t uhr_suffix_end(const std::string& text, size_t pos) {
+    static const std::string kUhr = "uhr";
+    const size_t start = skip_spaces(text, pos);
+    const size_t end = start + kUhr.size();
+    if (end > text.size()) return pos;
+    const auto same_letter = [](char want, char got) { return std::tolower(static_cast<unsigned char>(got)) == want; };
+    const bool is_uhr =
+        std::equal(kUhr.begin(), kUhr.end(), text.begin() + static_cast<std::ptrdiff_t>(start), same_letter);
+    if (!is_uhr || (end < text.size() && is_ascii_letter(static_cast<unsigned char>(text[end])))) return pos;
+    return end;
+}
+
 // Words for a percent sign next to one number, and whether they come before it (Chinese).
 std::pair<const char*, bool> percent_words(NumberLanguage language) {
     switch (language) {
@@ -281,25 +319,23 @@ std::pair<const char*, bool> percent_words(NumberLanguage language) {
 }
 
 bool pad_after(const std::string& text, size_t match_end) {
-    if (match_end >= text.size()) return false;
-    const unsigned char next = static_cast<unsigned char>(text[match_end]);
-    return (next >= 'A' && next <= 'Z') || (next >= 'a' && next <= 'z') || (next >= '0' && next <= '9');
+    return match_end < text.size() && is_ascii_alnum(static_cast<unsigned char>(text[match_end]));
 }
 
-// Words for one match, whether they need spaces against adjacent letters/digits, and the language
-// they were read in (Auto resolved).
-struct SpokenNumber {
-    std::string words;
-    bool pads;
-    NumberLanguage language;
-};
+// Auto resolved: English after an ASCII letter (script 1), else Chinese; a forced language is kept.
+NumberLanguage resolve_language(NumberLanguage language, unsigned char script) {
+    if (language != NumberLanguage::Auto) return language;
+    return script == 1 ? NumberLanguage::English : NumberLanguage::Chinese;
+}
 
-SpokenNumber spoken_number(const std::string& match, NumberLanguage language, unsigned char resolved_script) {
-    if (language == NumberLanguage::Spanish) return {read_number(match, g_spanish_words), true, language};
-    if (language == NumberLanguage::German) return {read_number(match, g_german_words), true, language};
-    const bool english = language == NumberLanguage::English || (language == NumberLanguage::Auto && resolved_script == 1);
-    if (english) return {read_number(match, g_english_words), true, NumberLanguage::English};
-    return {BasicStringUtil::NumberToChinese(match), false, NumberLanguage::Chinese};
+// Words for one number match in a resolved language.
+std::string number_words(const std::string& match, NumberLanguage resolved) {
+    switch (resolved) {
+        case NumberLanguage::Spanish: return read_number(match, g_spanish_words);
+        case NumberLanguage::German: return read_number(match, g_german_words);
+        case NumberLanguage::English: return read_number(match, g_english_words);
+        default: return BasicStringUtil::NumberToChinese(match);
+    }
 }
 
 // German reads a final 1 as "eins" on its own but as "ein" when a noun follows: "einprozentig", "ein Prozent".
@@ -319,14 +355,52 @@ std::string with_percent(std::string words, NumberLanguage language) {
     return prefix ? percent + words : words + percent;
 }
 
+// What replaces one match: `sign` is copied verbatim before the words, which need spaces against adjacent
+// letters/digits when `pads`; the replaced text ends at `end`.
+struct Replacement {
+    std::string sign;
+    std::string words;
+    bool pads;
+    size_t end;
+};
+
+size_t match_end(const std::smatch& match) { return static_cast<size_t>(match.position() + match.length()); }
+
+// A plain number, with a percent sign after it read too.
+Replacement number_replacement(const std::string& text, const std::smatch& match, NumberLanguage resolved) {
+    const size_t end = match_end(match);
+    const size_t sign_end = percent_sign_end(text, end);
+    const std::string words = number_words(match.str(), resolved);
+    return {"", sign_end != 0 ? with_percent(words, resolved) : words, resolved != NumberLanguage::Chinese,
+            sign_end != 0 ? sign_end : end};
+}
+
+// A clock time (groups: 1 sign, 2 hour, 3 minute, 4 second), with AM/PM for hours 1-12 and German "Uhr" consumed.
+Replacement time_replacement(const std::string& text, const std::smatch& match, NumberLanguage resolved) {
+    const int hour = std::stoi(match.str(2));
+    const size_t end = match_end(match);
+    const auto [meridiem, meridiem_end] =
+        hour >= 1 && hour <= 12 ? meridiem_suffix(text, end) : std::pair<Meridiem, size_t>{Meridiem::None, end};
+    const ClockTime time{hour, std::stoi(match.str(3)),
+                         match[4].matched ? std::optional<int>(std::stoi(match.str(4))) : std::nullopt,
+                         match.length(2) == 2 && match.str(2)[0] == '0', meridiem};
+    return {match.str(1), speak_time(time, resolved), resolved != NumberLanguage::Chinese,
+            resolved == NumberLanguage::German ? uhr_suffix_end(text, meridiem_end) : meridiem_end};
+}
+
 }  // namespace
 
 std::string number_to_english(const std::string& num_str) { return read_number(num_str, g_english_words); }
 
 std::string number_to_spanish(const std::string& num_str) { return read_number(num_str, g_spanish_words); }
 
+std::string number_to_german(const std::string& num_str) { return read_number(num_str, g_german_words); }
+
 std::string normalize_numbers(const std::string& text, NumberLanguage language) {
-    static const std::regex num_regex("[-+]?\\d+(?:\\.\\d+)*");
+    // A clock time H:MM[:SS] (ASCII or full-width colon) first, else a plain number.
+    static const std::regex num_regex(
+        "([-+]?)([01]?\\d|2[0-3])(?::|\xEF\xBC\x9A)([0-5]\\d)(?:(?::|\xEF\xBC\x9A)([0-5]\\d))?(?![\\d:])"
+        "|[-+]?\\d+(?:\\.\\d+)*");
     std::string result;
     size_t last_pos = 0;
     unsigned char last_script = 0;
@@ -340,16 +414,15 @@ std::string normalize_numbers(const std::string& text, NumberLanguage language) 
             const unsigned char script = script_of(static_cast<unsigned char>(c));
             if (script != 0) last_script = script;
         }
-        const size_t match_end = match.position() + match.length();
-        const SpokenNumber spoken =
-            spoken_number(match.str(), language, last_script != 0 ? last_script : text_script);
-        const size_t sign_end = percent_sign_end(text, match_end);
-        std::string replacement = sign_end != 0 ? with_percent(spoken.words, spoken.language) : spoken.words;
-        result += gap;
-        if (spoken.pads && pad_before(result)) replacement = " " + replacement;
-        if (spoken.pads && pad_after(text, sign_end != 0 ? sign_end : match_end)) replacement += " ";
-        result += replacement;
-        last_pos = sign_end != 0 ? sign_end : match_end;
+        const NumberLanguage resolved = resolve_language(language, last_script != 0 ? last_script : text_script);
+        const Replacement r = match[2].matched ? time_replacement(text, match, resolved)
+                                               : number_replacement(text, match, resolved);
+        result += gap + r.sign;
+        std::string words = r.words;
+        if (r.pads && pad_before(result)) words = " " + words;
+        if (r.pads && pad_after(text, r.end)) words += " ";
+        result += words;
+        last_pos = r.end;
     }
     if (last_pos < text.size()) result += text.substr(last_pos);
     return result;
