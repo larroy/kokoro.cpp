@@ -230,6 +230,16 @@ TEST_CASE("clock_time") {
         {"25:30", NumberLanguage::English, "twenty five:thirty"},
         {"10:5", NumberLanguage::English, "ten:five"},
         {"10:30 amazing", NumberLanguage::English, "ten thirty amazing"},
+        {"5 AM", NumberLanguage::English, "five ay em"},
+        {"5pm", NumberLanguage::English, "five pee em"},
+        {"5 a.m.", NumberLanguage::English, "five ay em."},
+        {"12 am", NumberLanguage::English, "twelve ay em"},
+        {"05 PM", NumberLanguage::English, "five pee em"},
+        {"15 AM", NumberLanguage::English, "fifteen AM"},
+        {"5 amber", NumberLanguage::English, "five amber"},
+        {"5 a. m.", NumberLanguage::Spanish, "cinco en punto a eme."},
+        {"5 PM", NumberLanguage::German, "siebzehn uhr"},
+        {"5 AM", NumberLanguage::Chinese, "上午五点"},
         {"10:49", NumberLanguage::Spanish, "diez y cuarenta y nueve"},
         {"19:29", NumberLanguage::Spanish, "diecinueve y veintinueve"},
         {"1:05", NumberLanguage::Spanish, "una y cinco"},
@@ -281,6 +291,8 @@ TEST_CASE("clock_time_phonemes") {
     const std::string am = g_en->phonemize("10:49 AM", NumberLanguage::Auto);
     CHECK(am == g_en->phonemize("ten forty nine ay em", NumberLanguage::Auto));
     CHECK(am.find("ˈA ˈɛm") != std::string::npos);
+    CHECK(g_en->phonemize("It is 5 AM now", NumberLanguage::Auto) ==
+          g_en->phonemize("It is five ay em now", NumberLanguage::Auto));
     CHECK(german_to_phonemes("Um 19:00 Uhr.", NumberLanguage::Auto, *g_de) ==
           german_to_phonemes("Um neunzehn Uhr.", NumberLanguage::Auto, *g_de));
 }

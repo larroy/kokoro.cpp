@@ -366,9 +366,26 @@ struct Replacement {
 
 size_t match_end(const std::smatch& match) { return static_cast<size_t>(match.position() + match.length()); }
 
+// A bare hour written before AM/PM ("5 PM", "5 a.m."), with where the time ends; nothing without a meridiem.
+std::optional<std::pair<ClockTime, size_t>> hour_meridiem_time(const std::string& text, const std::string& number,
+                                                              size_t end) {
+    if (number.empty() || number.size() > 2 || number.find_first_not_of("0123456789") != std::string::npos) {
+        return std::nullopt;
+    }
+    const int hour = std::stoi(number);
+    if (hour < 1 || hour > 12) return std::nullopt;
+    const auto [meridiem, meridiem_end] = meridiem_suffix(text, end);
+    if (meridiem == Meridiem::None) return std::nullopt;
+    const bool padded_hour = number.size() == 2 && number[0] == '0';
+    return std::make_pair(ClockTime{hour, 0, std::nullopt, padded_hour, meridiem}, meridiem_end);
+}
+
 // A plain number, with a percent sign after it read too.
 Replacement number_replacement(const std::string& text, const std::smatch& match, NumberLanguage resolved) {
     const size_t end = match_end(match);
+    if (const auto time = hour_meridiem_time(text, match.str(), end)) {
+        return {"", speak_time(time->first, resolved), resolved != NumberLanguage::Chinese, time->second};
+    }
     const size_t sign_end = percent_sign_end(text, end);
     const std::string words = number_words(match.str(), resolved);
     return {"", sign_end != 0 ? with_percent(words, resolved) : words, resolved != NumberLanguage::Chinese,

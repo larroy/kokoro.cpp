@@ -194,6 +194,8 @@ language.
   - Spanish: `19:29` → `diecinueve y veintinueve`, `1:00` → `una en punto`, `19:00` → `diecinueve horas`.
   - German: `19:29` → `neunzehn uhr neunundzwanzig`. AM/PM is converted to the 24-hour clock.
   - Chinese: `10:49 AM` → `上午十点四十九分`, `2:00` → `两点`.
+- An hour written on its own before AM/PM (`5 PM`, `5pm`, `5 a.m.`; hours 1–12 only) is a time too: `five ay em`.
+  Any other number keeps the plain-number reading (`5 amber`, `15 AM`).
 
 **Shared helpers.**
 - `NeuralG2P` (`src/NeuralG2P.*`) is one GRU seq2seq engine. Each caller passes its own `G2PSymbols`, whose index
