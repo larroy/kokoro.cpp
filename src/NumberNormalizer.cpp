@@ -248,20 +248,75 @@ bool pad_before(const std::string& result) {
     return (last >= 'A' && last <= 'Z') || (last >= 'a' && last <= 'z') || (last >= '0' && last <= '9');
 }
 
+// Position after any spaces at `pos` (space, tab, no-break space).
+size_t skip_spaces(const std::string& text, size_t pos) {
+    while (pos < text.size()) {
+        if (text[pos] == ' ' || text[pos] == '\t') {
+            ++pos;
+        } else if (text.compare(pos, 2, "\xC2\xA0") == 0) {
+            pos += 2;
+        } else {
+            break;
+        }
+    }
+    return pos;
+}
+
+// End of a percent sign right after a number at `pos`, spaces included ("35 %", "35%"); 0 if none.
+size_t percent_sign_end(const std::string& text, size_t pos) {
+    const size_t sign = skip_spaces(text, pos);
+    if (text.compare(sign, 1, "%") == 0) return sign + 1;
+    if (text.compare(sign, 3, "\xEF\xBC\x85") == 0) return sign + 3;  // full-width ％
+    return 0;
+}
+
+// Words for a percent sign next to one number, and whether they come before it (Chinese).
+std::pair<const char*, bool> percent_words(NumberLanguage language) {
+    switch (language) {
+        case NumberLanguage::Spanish: return {" por ciento", false};
+        case NumberLanguage::German: return {" prozent", false};  // lowercase: the lexicon keys are lowercase
+        case NumberLanguage::Chinese: return {"百分之", true};
+        default: return {" percent", false};
+    }
+}
+
 bool pad_after(const std::string& text, size_t match_end) {
     if (match_end >= text.size()) return false;
     const unsigned char next = static_cast<unsigned char>(text[match_end]);
     return (next >= 'A' && next <= 'Z') || (next >= 'a' && next <= 'z') || (next >= '0' && next <= '9');
 }
 
-// Unpadded words for one match, and whether they need spaces against adjacent letters/digits.
-std::pair<std::string, bool> spoken_number(const std::string& match, NumberLanguage language,
-                                           unsigned char resolved_script) {
-    if (language == NumberLanguage::Spanish) return {read_number(match, g_spanish_words), true};
-    if (language == NumberLanguage::German) return {read_number(match, g_german_words), true};
+// Words for one match, whether they need spaces against adjacent letters/digits, and the language
+// they were read in (Auto resolved).
+struct SpokenNumber {
+    std::string words;
+    bool pads;
+    NumberLanguage language;
+};
+
+SpokenNumber spoken_number(const std::string& match, NumberLanguage language, unsigned char resolved_script) {
+    if (language == NumberLanguage::Spanish) return {read_number(match, g_spanish_words), true, language};
+    if (language == NumberLanguage::German) return {read_number(match, g_german_words), true, language};
     const bool english = language == NumberLanguage::English || (language == NumberLanguage::Auto && resolved_script == 1);
-    if (english) return {read_number(match, g_english_words), true};
-    return {BasicStringUtil::NumberToChinese(match), false};
+    if (english) return {read_number(match, g_english_words), true, NumberLanguage::English};
+    return {BasicStringUtil::NumberToChinese(match), false, NumberLanguage::Chinese};
+}
+
+// German reads a final 1 as "eins" on its own but as "ein" when a noun follows: "einprozentig", "ein Prozent".
+std::string german_before_noun(std::string words) {
+    static const std::string kEins = "eins";
+    if (words.size() < kEins.size() || words.compare(words.size() - kEins.size(), kEins.size(), kEins) != 0) {
+        return words;
+    }
+    words.replace(words.size() - kEins.size(), kEins.size(), "ein");
+    return words;
+}
+
+// Appends or prepends the words for a percent sign: "35%" -> "thirty five percent", "百分之三十五".
+std::string with_percent(std::string words, NumberLanguage language) {
+    const auto [percent, prefix] = percent_words(language);
+    if (language == NumberLanguage::German) words = german_before_noun(std::move(words));
+    return prefix ? percent + words : words + percent;
 }
 
 }  // namespace
@@ -286,12 +341,15 @@ std::string normalize_numbers(const std::string& text, NumberLanguage language) 
             if (script != 0) last_script = script;
         }
         const size_t match_end = match.position() + match.length();
-        auto [replacement, pads] = spoken_number(match.str(), language, last_script != 0 ? last_script : text_script);
+        const SpokenNumber spoken =
+            spoken_number(match.str(), language, last_script != 0 ? last_script : text_script);
+        const size_t sign_end = percent_sign_end(text, match_end);
+        std::string replacement = sign_end != 0 ? with_percent(spoken.words, spoken.language) : spoken.words;
         result += gap;
-        if (pads && pad_before(result)) replacement = " " + replacement;
-        if (pads && pad_after(text, match_end)) replacement += " ";
+        if (spoken.pads && pad_before(result)) replacement = " " + replacement;
+        if (spoken.pads && pad_after(text, sign_end != 0 ? sign_end : match_end)) replacement += " ";
         result += replacement;
-        last_pos = match_end;
+        last_pos = sign_end != 0 ? sign_end : match_end;
     }
     if (last_pos < text.size()) result += text.substr(last_pos);
     return result;
