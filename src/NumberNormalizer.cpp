@@ -213,6 +213,15 @@ unsigned char first_script(const std::string& text) {
     return 0;
 }
 
+// Script of the last ASCII letter or CJK character in text[begin, end), `script` when there is none.
+unsigned char last_script_in(const std::string& text, size_t begin, size_t end, unsigned char script) {
+    for (size_t pos = begin; pos < end; ++pos) {
+        const unsigned char found = script_of(static_cast<unsigned char>(text[pos]));
+        if (found != 0) script = found;
+    }
+    return script;
+}
+
 // "one nine two dot one six eight dot zero dot one" for "192.168.0.1".
 std::string dotted_digits(const std::string& digits, const NumberWords& words) {
     std::string result;
@@ -405,6 +414,60 @@ Replacement time_replacement(const std::string& text, const std::smatch& match, 
             resolved == NumberLanguage::German ? uhr_suffix_end(text, meridiem_end) : meridiem_end};
 }
 
+// Length of a colon at `pos`: 1 for ASCII, 3 for full-width (：), 0 if there is none.
+size_t colon_length(const std::string& text, size_t pos) {
+    if (text.compare(pos, 1, ":") == 0) return 1;
+    if (text.compare(pos, 3, "\xEF\xBC\x9A") == 0) return 3;
+    return 0;
+}
+
+// Tells whether a digit or a colon at `pos` continues the number expression.
+bool continues_expression(const std::string& text, size_t pos) {
+    if (pos >= text.size()) return false;
+    const unsigned char c = static_cast<unsigned char>(text[pos]);
+    return (c >= '0' && c <= '9') || colon_length(text, pos) != 0;
+}
+
+// End of the number expression that starts at `begin`: its digits and colons.
+size_t expression_end(const std::string& text, size_t begin) {
+    size_t end = begin;
+    while (continues_expression(text, end)) {
+        const size_t colon = colon_length(text, end);
+        end += colon != 0 ? colon : 1;
+    }
+    return end;
+}
+
+// Reads every colon-separated field of an expression as a plain number, keeping its colons:
+// "25:10:05" -> "twenty five:ten:five".
+std::string expression_words(const std::string& expression, NumberLanguage resolved) {
+    std::string words;
+    size_t start = 0;
+    while (start < expression.size()) {
+        size_t colon = start;
+        while (colon < expression.size() && colon_length(expression, colon) == 0) ++colon;
+        if (colon > start) words += number_words(expression.substr(start, colon - start), resolved);
+        if (colon == expression.size()) break;
+        const size_t length = colon_length(expression, colon);
+        words += expression.substr(colon, length);
+        start = colon + length;
+    }
+    return words;
+}
+
+// The replacement for one number match: a clock time, a plain number, or — when colons continue the
+// expression past the match, as in "10:30:5" or "25:10:05" — its fields read as plain numbers.
+Replacement expression_replacement(const std::string& text, const std::smatch& match, NumberLanguage resolved) {
+    const size_t end = match_end(match);
+    if (!continues_expression(text, end)) {
+        return match[2].matched ? time_replacement(text, match, resolved) : number_replacement(text, match, resolved);
+    }
+    const size_t begin = static_cast<size_t>(match.position());
+    const size_t chain_end = expression_end(text, end);
+    return {"", expression_words(text.substr(begin, chain_end - begin), resolved),
+            resolved != NumberLanguage::Chinese, chain_end};
+}
+
 }  // namespace
 
 std::string number_to_english(const std::string& num_str) { return read_number(num_str, g_english_words); }
@@ -426,19 +489,18 @@ std::string normalize_numbers(const std::string& text, NumberLanguage language) 
     for (std::sregex_iterator it = std::sregex_iterator(text.begin(), text.end(), num_regex), end = std::sregex_iterator();
          it != end; ++it) {
         const std::smatch match = *it;
-        const std::string gap = text.substr(last_pos, match.position() - last_pos);
-        for (const char c : gap) {
-            const unsigned char script = script_of(static_cast<unsigned char>(c));
-            if (script != 0) last_script = script;
-        }
+        const size_t begin = static_cast<size_t>(match.position());
+        if (begin < last_pos) continue;  // already read with the previous number's suffix or colon expression
+        const std::string gap = text.substr(last_pos, begin - last_pos);
+        last_script = last_script_in(text, last_pos, begin, last_script);
         const NumberLanguage resolved = resolve_language(language, last_script != 0 ? last_script : text_script);
-        const Replacement r = match[2].matched ? time_replacement(text, match, resolved)
-                                               : number_replacement(text, match, resolved);
+        const Replacement r = expression_replacement(text, match, resolved);
         result += gap + r.sign;
         std::string words = r.words;
         if (r.pads && pad_before(result)) words = " " + words;
         if (r.pads && pad_after(text, r.end)) words += " ";
         result += words;
+        last_script = last_script_in(text, begin, r.end, last_script);  // the suffix read with the number ("AM", "Uhr")
         last_pos = r.end;
     }
     if (last_pos < text.size()) result += text.substr(last_pos);
