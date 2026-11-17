@@ -27,8 +27,8 @@ public object KokoroDict {
         val expected = assets.open(STAMP).use { it.readBytes().decodeToString() }
         val root = context.noBackupFilesDir
         val target = File(root, ASSET_DIR)
-        if (isCurrent(target, expected)) return target
-        // Every process of the app stages into the same directory: serialize them across processes too.
+        // Every process of the app installs into the same directory and a replacement deletes the target before the
+        // rename, so the stamp is read only under the lock: an unlocked read races with that rename.
         val lockFile = File(root, LOCK)
         FileChannel.open(lockFile.toPath(), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
             channel.lock().use {
