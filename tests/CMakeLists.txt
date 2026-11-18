@@ -43,13 +43,14 @@ if (KOKORO_BUILD_SERVER)
                     "-DCARGO=${CARGO}"
                     "-DMANIFEST=${PROJECT_SOURCE_DIR}/src/server/Cargo.toml"
                     "-DPROFILE=${KOKORO_CARGO_PROFILE}"
+                    "-DTARGET=${KOKORO_RUST_TRIPLE}"
                     "-DDLLS=${server_dlls_arg}"
                     -P "${CMAKE_CURRENT_LIST_DIR}/stage_test_dlls.cmake")
         set_tests_properties(server_stage_dlls PROPERTIES FIXTURES_SETUP server_dlls)
     endif()
     add_test(NAME server
         COMMAND ${CMAKE_COMMAND} -E env ${server_test_env}
-                "${CARGO}" test --locked --profile ${KOKORO_CARGO_PROFILE}
+                "${CARGO}" test --locked --profile ${KOKORO_CARGO_PROFILE} --target ${KOKORO_RUST_TRIPLE}
                 --manifest-path "${PROJECT_SOURCE_DIR}/src/server/Cargo.toml")
     if (WIN32)
         set_tests_properties(server PROPERTIES FIXTURES_REQUIRED server_dlls)
