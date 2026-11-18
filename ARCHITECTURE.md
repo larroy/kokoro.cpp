@@ -246,6 +246,9 @@ it. Targets with no mapping (Android, iOS, macOS universal) default the server O
 library is missing fails at configure time; the probe uses the rustc cargo will (`RUSTC`, else `PATH`, else the one
 beside cargo). Cross builds link with the configured C compiler, which must already default to the Rust triple: a
 compiler that takes its target from `CMAKE_C_COMPILER_TARGET` (clang cross builds) needs `-DKOKORO_RUST_LINKER`.
+An existing `CARGO_TARGET_<TRIPLE>_LINKER` in the environment takes precedence over `KOKORO_RUST_LINKER`; unset it
+when the wrapper is needed. aarch64 MinGW maps to `aarch64-pc-windows-gnullvm`; i686 and x86_64 MinGW map to
+`*-pc-windows-gnu`.
 - `Engine` (`engine.rs`) owns the one context; `Audio` frees the samples with `kokoro_audio_free` on drop.
 - `AppState` (`routes.rs`) keeps the engine behind a `tokio::sync::Mutex`. A request waits for the lock without a
   thread, then synthesizes in `spawn_blocking`, which also reads the thread-local `kokoro_last_error()`.
