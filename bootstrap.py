@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parent
 ORT_DIR = ROOT / "third_party" / "onnxruntime"
 ORT_STAMP = ORT_DIR / ".archive"
 ORT_VERSION = "1.23.2"
-ORT_URL = f"https://github.com/microsoft/onnxruntime/releases/download/v{ORT_VERSION}"
+ORT_URL = f"https://github.com/larroy/onnxruntime/releases/download/v{ORT_VERSION}"
 MODELS_DIR = ROOT / "models"
 
 @dataclass(frozen=True)
@@ -172,7 +172,7 @@ GERMAN_PACK = VoicePack("voices-de.bin", "98e7a1f718167e632e252b71f1aef159cbf5d6
                         GERMAN_VOICES, ".gguf", voice_tool.load_gguf)
 VOICE_PACKS = (SPANISH_PACK, GERMAN_PACK)
 
-ORT_GIT_URL = "https://github.com/microsoft/onnxruntime.git"
+ORT_GIT_URL = "https://github.com/larroy/onnxruntime.git"
 ORT_SRC_DIR = ROOT / "third_party" / "onnxruntime-src"
 MIN_ORT_CMAKE = (3, 28)
 CUDNN_HELP = (
