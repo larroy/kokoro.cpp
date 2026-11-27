@@ -173,6 +173,8 @@ GERMAN_PACK = VoicePack("voices-de.bin", "98e7a1f718167e632e252b71f1aef159cbf5d6
 VOICE_PACKS = (SPANISH_PACK, GERMAN_PACK)
 
 ORT_GIT_URL = "https://github.com/larroy/onnxruntime.git"
+# Upstream v1.23.2. The fork's tag could be moved, so the commit is what gets verified, not the tag.
+ORT_COMMIT = "a83fc4d58cb48eb68890dd689f94f28288cf2278"
 ORT_SRC_DIR = ROOT / "third_party" / "onnxruntime-src"
 MIN_ORT_CMAKE = (3, 28)
 CUDNN_HELP = (
@@ -494,12 +496,22 @@ def default_cuda_arch(gpus: tuple[Gpu, ...]) -> str:
     return ";".join(sorted({gpu.sm for gpu in gpus}))
 
 
+def check_ort_commit(src_dir: Path) -> None:
+    """Refuses a checkout whose HEAD is not the pinned onnxruntime commit."""
+    head = (run_capture(["git", "-C", str(src_dir), "rev-parse", "HEAD"]) or "").strip()
+    if head != ORT_COMMIT:
+        raise click.ClickException(
+            f"{src_dir} is at {head or 'an unreadable commit'}, expected {ORT_COMMIT} (onnxruntime "
+            f"{ORT_VERSION}); delete it or pass --src-dir")
+
+
 def checkout_onnxruntime(src_dir: Path) -> None:
     tag = f"v{ORT_VERSION}"
     if (src_dir / ".git").exists():
         describe = (run_capture(["git", "-C", str(src_dir), "describe", "--tags", "--exact-match"]) or "").strip()
         if describe != tag:
             raise click.ClickException(f"{src_dir} is not an onnxruntime {tag} checkout; delete it or pass --src-dir")
+        check_ort_commit(src_dir)
         return
     if src_dir.exists() and any(src_dir.iterdir()):
         raise click.ClickException(f"{src_dir} exists and is not a git checkout; delete it or pass --src-dir")
@@ -507,6 +519,7 @@ def checkout_onnxruntime(src_dir: Path) -> None:
         raise click.ClickException("git not found in PATH")
     run(["git", "clone", "--depth", "1", "--branch", tag, "--recurse-submodules", "--shallow-submodules",
          ORT_GIT_URL, str(src_dir)])
+    check_ort_commit(src_dir)
 
 
 def ort_build_command(cmake: str, src_dir: Path, build_dir: Path, cuda_home: Path, cudnn_home: Path,

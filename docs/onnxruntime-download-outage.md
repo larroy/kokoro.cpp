@@ -6,28 +6,33 @@ included. This records what still works, what is broken, and where 1.23.2 is sti
 **Update 2026-11-26:** the eight archives are now served by [larroy/onnxruntime release `v1.23.2`](https://github.com/larroy/onnxruntime/releases/tag/v1.23.2),
 repackaged unmodified from Microsoft's 1.23.2 NuGet packages on nuget.org; `bootstrap.py configure` works again.
 
-## Verdict
+## Verdict (2026-11-25 status)
 
-`bootstrap.py` cannot download ONNX Runtime: all eight release archives and the source clone are gone.
-Every model and voice download is unaffected.
+As of 2026-11-25, `bootstrap.py` could not download ONNX Runtime: all eight release archives and the source
+clone were gone. Every model and voice download was unaffected.
 
 An existing `third_party/onnxruntime/` (`.archive` = `onnxruntime-win-x64-1.23.2.zip`) and an existing
-`models/` keep builds working. A clean clone, `configure --force`, and CI do not.
+`models/` kept builds working. A clean clone, `configure --force`, and CI did not.
 
-## Probed URLs
+Superseded by the 2026-11-26 update: `configure` fetches the repackaged archives again.
+
+## Probed URLs (probed 2026-11-25)
 
 | `bootstrap.py` download | Source | Result |
 |---|---|---|
 | 6 CPU archives (`onnxruntime-{linux-x64,linux-aarch64,osx-x86_64,osx-arm64,win-x64,win-arm64}-1.23.2.*`) | `ORT_URL` (`bootstrap.py:34`) → GitHub release `v1.23.2` | **404** (all six) |
 | 2 CUDA archives (`linux-x64-gpu`, `win-x64-gpu`) | same | **404** (both) |
-| `build-ort` source clone, tag `v1.23.2` | `ORT_GIT_URL` (`bootstrap.py:175`) | **dead**: `info/refs` → 401, repo API → 404 |
+| `build-ort` source clone, tag `v1.23.2`, from `microsoft/onnxruntime` | `ORT_GIT_URL` (`bootstrap.py:175`), since pointed at `larroy/onnxruntime` | **dead**: `info/refs` → 401, repo API → 404 |
 | `kokoro-v1.1-zh.onnx`, `voices-v1.1-zh.bin` | `larroy/kokoro.cpp` release `voices_model_files` | 206 OK |
 | `kokoro-v1.0.onnx` | `thewh1teagle/kokoro-onnx` release `model-files-v1.0` | 206 OK |
 | `kokoro-de.onnx` | HF `Godelaune/Kokoro-82M-ONNX-German-Martin` | 206 OK |
 | Spanish voices `ef_dora`, `em_alex`, `em_santa` | HF `onnx-community/Kokoro-82M-v1.0-ONNX` | 206 OK |
 | German voices `df_eva`, `df_victoria`, `dm_bernd`, `dm_martin` | HF `cstr/kokoro-voices-GGUF` | 206 OK |
 
-## Blast radius
+## Blast radius (2026-11-25 status)
+
+Superseded by the 2026-11-26 update, and by repointing the documentation links at the fork's release: none of
+these failures reproduce today.
 
 - `install_onnxruntime()` (`bootstrap.py:342-357`) fails on every platform.
 - `bootstrap.py build-ort` (source build with CUDA for GPUs outside the prebuilt arch list) cannot clone
@@ -63,17 +68,23 @@ reports that revision's metadata, which is how the SHA below was corroborated in
 | Debian sid source `onnxruntime_1.23.2+dfsg-6.1` | `onnxruntime_1.23.2+dfsg.orig.tar.xz`, 38,793,400 bytes, sha256 `c601bdc18b542435e5a0149ca18dc353106e0ed87a38d96ed759f1a82a52ef43`, matching the signed `.dsc`. Root prefix `microsoft-onnxruntime-a83fc4d/` (the GitHub auto-archive of that commit). 9635 entries: `onnxruntime/`, `orttraining/`, `tools/ci_build/build.py`, `cmake/deps.txt`, `cmake/external/`, `include/`, `VERSION_NUMBER` = 1.23.2. | Official Debian archive, signed checksums. `Files-Excluded` only drops `*.onnx`, `*.bin`, testdata `.mp3`/`.png` and Windows binary patches — irrelevant with `onnxruntime_BUILD_UNIT_TESTS=OFF`. Debian also ships `libonnxruntime-dev 1.23.2+dfsg-6.1` for amd64/arm64/armhf/i386/loong64/ppc64el/riscv64/s390x, so the tree is known-buildable. `debian.tar.xz` patches are separate and not applied by a plain upstream build. |
 | Software Heritage vault | Archived copy of the origin; revisions are served as **gitfast** bundles: `POST /api/1/vault/gitfast/swh:1:rev:a83fc4d5…/`, then poll, then `git clone` the bundle. `flat` answers 400 for revisions (directories only) and requests need a User-Agent. | Archive-grade, but full history and long cook times. |
 
-Cross-check run: Debian orig tarball blobs and GitCode clone blobs for `VERSION_NUMBER` (`14bee92c…`) and
-`cmake/deps.txt` (`01e5c809…`) are identical, i.e. the two mirrors carry the same upstream tree.
+Cross-check run: the blobs for `VERSION_NUMBER` (`14bee92c…`) and `cmake/deps.txt` (`01e5c809…`) match
+between the Debian orig tarball and the GitCode clone, so the two mirrors agree on the version and on the
+build dependency set. That is not tree equality — Debian's `Files-Excluded` drops `*.onnx`, `*.bin` and
+testdata files — so the shared upstream commit rests on the `a83fc4d5…` revision that both channels report
+(Debian's archive root prefix, Software Heritage's archived origin), not on this two-blob sample.
 
 Build dependencies are not mirror-hosted: of the 40 URLs in `cmake/deps.txt` at that commit, 39 answer
 200/206 (onnx v1.18.0, protobuf v21.12 + protoc binaries, abseil, cutlass v3.9.2, cudnn-frontend v1.12.0,
 eigen, XNNPACK, googletest, …). The single 404 is `microsoft/onnxruntime-extensions` (`c24b7ba…`), fetched
 only for `--use_extensions`, which `bootstrap.py:ort_build_command` does not pass.
 
-`checkout_onnxruntime()` (`bootstrap.py:497-510`) should gain a configurable source URL defaulting to a
-mirror, and must assert `git rev-parse v1.23.2^{commit}` equals `a83fc4d58cb48eb68890dd689f94f28288cf2278`
-before configuring. That assertion, not the host name, is what makes a third-party mirror trustworthy.
+`checkout_onnxruntime()` (`bootstrap.py:508-522`) defaults `ORT_GIT_URL` (`bootstrap.py:175`) to
+`larroy/onnxruntime` and calls `check_ort_commit()` (`bootstrap.py:499-505`) on both the existing-checkout and
+the fresh-clone path, failing before configure unless `git rev-parse HEAD` equals `ORT_COMMIT`
+(`bootstrap.py:177`) = `a83fc4d58cb48eb68890dd689f94f28288cf2278`. Pointing `ORT_GIT_URL` at any of the
+mirrors listed here keeps the same pin. That assertion, not the host name, is what makes a third-party mirror
+trustworthy.
 
 ## Migration notes
 
