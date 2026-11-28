@@ -26,7 +26,7 @@ uv run bootstrap.py configure
 
 This downloads, verifying SHA-256 checksums:
 
-- the prebuilt [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU; the CUDA build on supported NVIDIA GPUs, see below) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
+- the prebuilt [ONNX Runtime](https://github.com/larroy/onnxruntime/tree/v1.23.2) 1.23.2 (CPU; the CUDA build on supported NVIDIA GPUs, see below) for the current platform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) into `third_party/onnxruntime/`;
 - the model `kokoro-v1.1-zh.onnx` and the voice pack `voices-v1.1-zh.bin` from this repository's [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) into `models/`;
 - the Kokoro-82M v1.0 model `kokoro-v1.0.onnx` from [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), and the Spanish voices `ef_dora`, `em_alex` and `em_santa` from [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), packed into `models/voices-v1.0-es.bin`;
 - the German fine-tune `kokoro-de.onnx` from [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin), and the German voices `df_eva`, `df_victoria`, `dm_bernd` and `dm_martin` from [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF), packed into `models/voices-de.bin`.
@@ -281,7 +281,7 @@ uv run bootstrap.py configure
 
 该命令会下载以下文件并校验 SHA-256：
 
-- 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2（CPU 版；受支持的 NVIDIA GPU 上为 CUDA 版，见下文），放入 `third_party/onnxruntime/`；
+- 当前平台（Linux x64/aarch64、macOS arm64/x86_64、Windows x64/arm64）的预编译 [ONNX Runtime](https://github.com/larroy/onnxruntime/tree/v1.23.2) 1.23.2（CPU 版；受支持的 NVIDIA GPU 上为 CUDA 版，见下文），放入 `third_party/onnxruntime/`；
 - 模型 `kokoro-v1.1-zh.onnx` 和语音包 `voices-v1.1-zh.bin`，来自本仓库的 [`voices_model_files` release](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files)，放入 `models/`；
 - Kokoro-82M v1.0 模型 `kokoro-v1.0.onnx`（来自 [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)），以及西班牙语语音 `ef_dora`、`em_alex`、`em_santa`（来自 [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX)），打包为 `models/voices-v1.0-es.bin`；
 - 德语微调模型 `kokoro-de.onnx`（来自 [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin)），以及德语语音 `df_eva`、`df_victoria`、`dm_bernd`、`dm_martin`（来自 [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF)），打包为 `models/voices-de.bin`。
@@ -507,7 +507,7 @@ uv run bootstrap.py configure
 
 Descarga, verificando las sumas SHA-256:
 
-- el [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 precompilado (CPU; la build CUDA en GPUs NVIDIA compatibles, ver más abajo) para la plataforma actual (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) en `third_party/onnxruntime/`;
+- el [ONNX Runtime](https://github.com/larroy/onnxruntime/tree/v1.23.2) 1.23.2 precompilado (CPU; la build CUDA en GPUs NVIDIA compatibles, ver más abajo) para la plataforma actual (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) en `third_party/onnxruntime/`;
 - el modelo `kokoro-v1.1-zh.onnx` y el paquete de voces `voices-v1.1-zh.bin` del [release `voices_model_files`](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) de este repositorio en `models/`;
 - el modelo Kokoro-82M v1.0 `kokoro-v1.0.onnx` de [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0), y las voces españolas `ef_dora`, `em_alex` y `em_santa` de [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), empaquetadas en `models/voices-v1.0-es.bin`;
 - el modelo afinado para alemán `kokoro-de.onnx` de [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin), y las voces alemanas `df_eva`, `df_victoria`, `dm_bernd` y `dm_martin` de [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF), empaquetadas en `models/voices-de.bin`.
@@ -754,7 +754,7 @@ uv run bootstrap.py configure
 
 Lädt herunter und prüft dabei die SHA-256-Prüfsummen:
 
-- das vorkompilierte [ONNX Runtime](https://github.com/microsoft/onnxruntime/releases/tag/v1.23.2) 1.23.2 (CPU; auf unterstützten NVIDIA-GPUs die CUDA-Variante, siehe unten) für die aktuelle Plattform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) nach `third_party/onnxruntime/`;
+- das vorkompilierte [ONNX Runtime](https://github.com/larroy/onnxruntime/tree/v1.23.2) 1.23.2 (CPU; auf unterstützten NVIDIA-GPUs die CUDA-Variante, siehe unten) für die aktuelle Plattform (Linux x64/aarch64, macOS arm64/x86_64, Windows x64/arm64) nach `third_party/onnxruntime/`;
 - das Modell `kokoro-v1.1-zh.onnx` und das Stimmenpaket `voices-v1.1-zh.bin` aus dem [Release `voices_model_files`](https://github.com/larroy/kokoro.cpp/releases/tag/voices_model_files) dieses Repositorys nach `models/`;
 - das Modell Kokoro-82M v1.0 `kokoro-v1.0.onnx` von [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) und die spanischen Stimmen `ef_dora`, `em_alex` und `em_santa` von [onnx-community/Kokoro-82M-v1.0-ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX), gepackt in `models/voices-v1.0-es.bin`;
 - das deutsche Fine-Tune `kokoro-de.onnx` von [Godelaune/Kokoro-82M-ONNX-German-Martin](https://huggingface.co/Godelaune/Kokoro-82M-ONNX-German-Martin) und die deutschen Stimmen `df_eva`, `df_victoria`, `dm_bernd` und `dm_martin` von [cstr/kokoro-voices-GGUF](https://huggingface.co/cstr/kokoro-voices-GGUF), gepackt in `models/voices-de.bin`.

@@ -73,7 +73,7 @@ and each crate's license text ships in its source package (`cargo tree -e normal
 
 ### ONNX Runtime
 
-- Source: https://github.com/microsoft/onnxruntime
+- Source: https://github.com/larroy/onnxruntime (tag `v1.23.2`, preserved history of `microsoft/onnxruntime`)
 - License: MIT
 - The NuGet packages depend on `Microsoft.ML.OnnxRuntime` (or `Microsoft.ML.OnnxRuntime.Gpu.Windows`)
   and do not ship their own copy of `onnxruntime.dll`.

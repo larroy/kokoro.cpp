@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parent
 ORT_DIR = ROOT / "third_party" / "onnxruntime"
 ORT_STAMP = ORT_DIR / ".archive"
 ORT_VERSION = "1.23.2"
-ORT_URL = f"https://github.com/microsoft/onnxruntime/releases/download/v{ORT_VERSION}"
+ORT_URL = f"https://github.com/larroy/onnxruntime/releases/download/v{ORT_VERSION}"
 MODELS_DIR = ROOT / "models"
 
 @dataclass(frozen=True)
@@ -71,22 +71,22 @@ class OrtChoice:
 ORT_ARCHIVES = {
     ("linux", "x64"): OrtArchive(
         f"onnxruntime-linux-x64-{ORT_VERSION}.tgz",
-        "1fa4dcaef22f6f7d5cd81b28c2800414350c10116f5fdd46a2160082551c5f9b"),
+        "5b2048c40e97012e74c5116869283a87cff58af057e6861c85e361082d5cb16f"),
     ("linux", "arm64"): OrtArchive(
         f"onnxruntime-linux-aarch64-{ORT_VERSION}.tgz",
-        "7c63c73560ed76b1fac6cff8204ffe34fe180e70d6582b5332ec094810241e5c"),
+        "0cd1a5dfbb2baabe15548616f35118de309f5d406009f166cde5bd6dd21426b9"),
     ("darwin", "x64"): OrtArchive(
         f"onnxruntime-osx-x86_64-{ORT_VERSION}.tgz",
-        "d10359e16347b57d9959f7e80a225a5b4a66ed7d7e007274a15cae86836485a6"),
+        "9baf69ce28f58abba6a14e0157e9819d6f29748096b03f748de28867d67ba671"),
     ("darwin", "arm64"): OrtArchive(
         f"onnxruntime-osx-arm64-{ORT_VERSION}.tgz",
-        "b4d513ab2b26f088c66891dbbc1408166708773d7cc4163de7bdca0e9bbb7856"),
+        "daf04bf0087e1863d734e46f843bc8fbc3e3317fb1857d41bbd6b2afdac98698"),
     ("win32", "x64"): OrtArchive(
         f"onnxruntime-win-x64-{ORT_VERSION}.zip",
-        "0b38df9af21834e41e73d602d90db5cb06dbd1ca618948b8f1d66d607ac9f3cd"),
+        "3d14773ac2b1ea41a1f3302820b24f59c402a8f746116771af312dc452642fd8"),
     ("win32", "arm64"): OrtArchive(
         f"onnxruntime-win-arm64-{ORT_VERSION}.zip",
-        "1cfe88b6435df3b5fb0e9f6bd7d6f5df1e887b6174de7f6e2a47bab956f3f168"),
+        "311bd54294d080898a7baa4a8980990e3379441f1f3d94a6e35542190a875245"),
 }
 
 # Kernel architectures of the prebuilt CUDA packages, from upstream v1.23.2:
@@ -95,11 +95,11 @@ ORT_ARCHIVES = {
 ORT_GPU_ARCHIVES = {
     ("linux", "x64"): OrtArchive(
         f"onnxruntime-linux-x64-gpu-{ORT_VERSION}.tgz",
-        "2083e361072a79ce16a90dcd5f5cb3ab92574a82a3ce0ac01e5cfa3158176f53",
+        "6ddeac987e4a4072d38c9f6d994f062ede15842484ddca1b3a9cad800085fffc",
         CudaArchs(real=((6, 0), (7, 0), (7, 5), (8, 0)), virtual=(9, 0))),
     ("win32", "x64"): OrtArchive(
         f"onnxruntime-win-x64-gpu-{ORT_VERSION}.zip",
-        "e77afdbbc2b8cb6da4e5a50d89841b48c44f3e47dce4fb87b15a2743786d0bb9",
+        "3d08344a1071921ca89fc67a5ee6382716276728d38e291a58117412079f54eb",
         CudaArchs(real=((7, 5), (8, 6), (8, 9)), virtual=(9, 0))),
 }
 
@@ -172,7 +172,9 @@ GERMAN_PACK = VoicePack("voices-de.bin", "98e7a1f718167e632e252b71f1aef159cbf5d6
                         GERMAN_VOICES, ".gguf", voice_tool.load_gguf)
 VOICE_PACKS = (SPANISH_PACK, GERMAN_PACK)
 
-ORT_GIT_URL = "https://github.com/microsoft/onnxruntime.git"
+ORT_GIT_URL = "https://github.com/larroy/onnxruntime.git"
+# Upstream v1.23.2. The fork's tag could be moved, so the commit is what gets verified, not the tag.
+ORT_COMMIT = "a83fc4d58cb48eb68890dd689f94f28288cf2278"
 ORT_SRC_DIR = ROOT / "third_party" / "onnxruntime-src"
 MIN_ORT_CMAKE = (3, 28)
 CUDNN_HELP = (
@@ -494,12 +496,22 @@ def default_cuda_arch(gpus: tuple[Gpu, ...]) -> str:
     return ";".join(sorted({gpu.sm for gpu in gpus}))
 
 
+def check_ort_commit(src_dir: Path) -> None:
+    """Refuses a checkout whose HEAD is not the pinned onnxruntime commit."""
+    head = (run_capture(["git", "-C", str(src_dir), "rev-parse", "HEAD"]) or "").strip()
+    if head != ORT_COMMIT:
+        raise click.ClickException(
+            f"{src_dir} is at {head or 'an unreadable commit'}, expected {ORT_COMMIT} (onnxruntime "
+            f"{ORT_VERSION}); delete it or pass --src-dir")
+
+
 def checkout_onnxruntime(src_dir: Path) -> None:
     tag = f"v{ORT_VERSION}"
     if (src_dir / ".git").exists():
         describe = (run_capture(["git", "-C", str(src_dir), "describe", "--tags", "--exact-match"]) or "").strip()
         if describe != tag:
             raise click.ClickException(f"{src_dir} is not an onnxruntime {tag} checkout; delete it or pass --src-dir")
+        check_ort_commit(src_dir)
         return
     if src_dir.exists() and any(src_dir.iterdir()):
         raise click.ClickException(f"{src_dir} exists and is not a git checkout; delete it or pass --src-dir")
@@ -507,6 +519,7 @@ def checkout_onnxruntime(src_dir: Path) -> None:
         raise click.ClickException("git not found in PATH")
     run(["git", "clone", "--depth", "1", "--branch", tag, "--recurse-submodules", "--shallow-submodules",
          ORT_GIT_URL, str(src_dir)])
+    check_ort_commit(src_dir)
 
 
 def ort_build_command(cmake: str, src_dir: Path, build_dir: Path, cuda_home: Path, cudnn_home: Path,
