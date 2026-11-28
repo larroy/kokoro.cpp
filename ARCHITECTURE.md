@@ -240,6 +240,16 @@ These are the touch points the German addition went through, in order:
 **HTTP server (`src/server/`).** A Rust crate (axum + tokio) that links `libkokoro` through hand-written C API
 declarations (`ffi.rs`) and serves an OpenAI-compatible API. CMake builds it with cargo (`KOKORO_BUILD_SERVER`) and
 copies `kokoro-server` next to `libkokoro`; `build.rs` links against the library and sets the rpath.
+`cmake/KokoroRustTarget.cmake` maps the CMake target (not the host) to a Rust triple that cargo builds with `--target`,
+taking the Linux C library (glibc or musl) from the toolchain's own triple. `-DKOKORO_RUST_TARGET=<triple>` overrides
+it. Targets with no mapping (Android, iOS, macOS universal) default the server OFF, and a triple whose Rust standard
+library is missing fails at configure time; the probe uses the rustc cargo will (`RUSTC`, else `PATH`, else the one
+beside cargo). Cross builds link with the configured C compiler, which must already default to the Rust triple: a
+compiler that takes its target from `CMAKE_C_COMPILER_TARGET` (clang cross builds) needs `-DKOKORO_RUST_LINKER`.
+An existing `CARGO_TARGET_<TRIPLE>_LINKER` in the environment takes precedence over `KOKORO_RUST_LINKER`; unset it
+when the wrapper is needed. `KOKORO_RUST_LINKER` only applies to non-MSVC cross builds; MSVC cross builds must set
+`CARGO_TARGET_<TRIPLE>_LINKER` directly. aarch64 MinGW maps to `aarch64-pc-windows-gnullvm`; i686 and x86_64 MinGW
+map to `*-pc-windows-gnu`.
 - `Engine` (`engine.rs`) owns the one context; `Audio` frees the samples with `kokoro_audio_free` on drop.
 - `AppState` (`routes.rs`) keeps the engine behind a `tokio::sync::Mutex`. A request waits for the lock without a
   thread, then synthesizes in `spawn_blocking`, which also reads the thread-local `kokoro_last_error()`.
